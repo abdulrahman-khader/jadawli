@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { db, put, del } from "../lib/store.js";
+import { useRemoteHost } from "../lib/remote.js";
+import { RemoteButton, RemoteQr, studentList } from "../components/remote-qr.jsx";
 import { go } from "../lib/router.js";
-import { n, pct, secs, toast, opName, fmtDate, downloadCSV } from "../lib/util.js";
+import { n, pct, secs, toast, opName, fmtDate, downloadCSV, isAr } from "../lib/util.js";
 import { testStats, sc, qText, qAns, qPlain } from "../lib/stats.js";
 import {
   Shell, Avatar, Icon, Empty, Kpi, OpTag, ConfirmButton, PageHead, Panel, List, Row, RowMain, RowActions, Score, Btn, useBusy, nextFrame, Hint,
@@ -13,6 +16,13 @@ import { cn } from "../lib/utils.js";
 export default function TestView({ r }) {
   const t = db.data.tests[r.id];
   const [busyX, runX] = useBusy();
+  // تحكم الجوال: من هنا يختار المعلم الطالب من جواله قبل بدء الاختبار
+  const [qrOpen, setQrOpen] = useState(false);
+  useRemoteHost(t ? { phase: "list", info: `اختبار ${opName(t.op)} · ${db.data.classes[t.classId]?.name || ""}`, students: studentList(testStats(t).studs, t), ar: isAr() } : { phase: "idle" },
+    (cmd, d = {}) => {
+      if (cmd === "hello") { setQrOpen(false); toast("تم ربط الجوال ✓"); }
+      else if (cmd === "pick" && t && d.sid && db.data.students[d.sid]) go("run", t.id, null, d.sid);
+    });
   if (!t) return <Shell title="الاختبار" back={["home"]}><Empty title="هذا الاختبار غير موجود" /></Shell>;
   const c = db.data.classes[t.classId]; const st = testStats(t);
   const next = st.studs.find((s) => !t.results?.[s.id]);
@@ -33,6 +43,7 @@ export default function TestView({ r }) {
       <div className="flex flex-wrap gap-1.5"><Badge className={t.op === "div" ? "bg-div-soft text-div" : "bg-secondary text-primary"}>الجداول: {t.tables.map(n).join("، ")}</Badge>
         <Badge variant="outline">{n(t.count)} سؤال</Badge><Badge variant="outline">{n(t.seconds)} ثوانٍ للسؤال</Badge>{t.strict && <Badge className="bg-warm/30 text-foreground">استبعاد نهائي</Badge>}</div>
       {next && <Button variant="warm" size="xl" onClick={() => go("run", t.id, null, next.id)}><Icon name="play" /> ابدأ مع {next.name}</Button>}
+      <RemoteButton className="self-start" onClick={() => setQrOpen(true)} /><RemoteQr open={qrOpen} onClose={() => setQrOpen(false)} />
       <div className="kpis"><Kpi v={pct(st.avg)} label="المتوسط" /><Kpi v={pct(st.max)} label="الأعلى" /><Kpi v={pct(st.min)} label="الأقل" />
         <Kpi v={`${n(st.done.length)}/${n(st.studs.length)}`} label={`أنهوا · ${n(st.absent)} غائب`} /></div>
       <h2>الطلاب</h2>

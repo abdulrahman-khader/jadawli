@@ -3,12 +3,12 @@ import { db, put } from "../lib/store.js";
 import { go } from "../lib/router.js";
 import { n, pct, secs, opName, levelColor, toast, isAr } from "../lib/util.js";
 import { classStudents, makeQuestions, sc, qText, qAns } from "../lib/stats.js";
-import { Shell, Avatar, Stars, Icon, Empty, ConfirmButton, Spinner } from "../components/app.jsx";
+import { Shell, Avatar, Stars, Icon, Empty, ConfirmButton } from "../components/app.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { Badge } from "../components/ui/badge.jsx";
 import { Card } from "../components/ui/card.jsx";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog.jsx";
-import { remoteAvailable, remoteToken, remoteCreate, remoteUrl, qrSvg, useRemoteHost } from "../lib/remote.js";
+import { useRemoteHost } from "../lib/remote.js";
+import { RemoteButton, RemoteQr, studentList } from "../components/remote-qr.jsx";
 
 const CIRC = 2 * Math.PI * 52;
 const REVEAL_MS = 1500;
@@ -20,7 +20,7 @@ export default function Run({ r }) {
   const [, force] = useReducer((x) => x + 1, 0);
   const run = R.current; const total = (t?.seconds || 10) * 1000;
 
-  const begin = () => { run.qStart = performance.now(); run.left = total; run.endAt = Date.now() + total; run.paused = false; run.reveal = false; force(); };
+  const begin = () => { run.qStart = performance.now(); run.left = total; run.remain = total; run.seg = (run.seg || 0) + 1; run.paused = false; run.reveal = false; force(); };
   const finish = () => { t.results = t.results || {}; t.results[s.id] = { status: "done", items: run.qs, at: Date.now() }; put("tests", t); run.phase = "done"; force(); window.scrollTo(0, 0); };
   const next = () => { if (!run.reveal) return; run.reveal = false; run.i++; if (run.i >= run.qs.length) finish(); else begin(); };
   const mark = (ok, timeout) => {
@@ -31,7 +31,7 @@ export default function Run({ r }) {
   };
   const togglePause = () => {
     if (run.reveal) return;
-    if (run.paused) { run.qStart += performance.now() - run.pausedAt; run.paused = false; run.endAt = Date.now() + total - (performance.now() - run.qStart); } else { run.paused = true; run.pausedAt = performance.now(); }
+    if (run.paused) { run.qStart += performance.now() - run.pausedAt; run.paused = false; run.remain = total - (performance.now() - run.qStart); run.seg = (run.seg || 0) + 1; } else { run.paused = true; run.pausedAt = performance.now(); }
     force();
   };
   // المؤقت
@@ -56,13 +56,17 @@ export default function Run({ r }) {
   const [qrOpen, setQrOpen] = useState(false);
   const nextStud = () => (t ? classStudents(t.classId).find((z) => !t.results?.[z.id] && z.id !== s?.id) : null);
   const goNext = () => { const nx = nextStud(); if (nx) go("run", t.id, null, nx.id, { replace: true }); else go("test", t.id); };
-  const onCmd = (c) => {
+  const onCmd = (c, d = {}) => {
     if (c === "hello") { setQrOpen(false); toast("تم ربط الجوال ✓"); return; }
+    if (c === "pick") { if (run.phase !== "q" && d.sid && d.sid !== s.id && db.data.students[d.sid]) go("run", t.id, null, d.sid, { replace: true }); return; }
     if (run.phase === "ready") {
       if (c === "start" && run.qs.length) { run.phase = "q"; begin(); }
       else if (c === "absent") { t.results = t.results || {}; t.results[s.id] = { status: "absent", at: Date.now() }; put("tests", t); goNext(); }
     } else if (run.phase === "q") {
+      if (d.i != null && d.i !== run.i) return; // أمر متأخر لسؤال سابق
       if (c === "ok") mark(true, false); else if (c === "no") mark(false, false); else if (c === "next") next(); else if (c === "pause") togglePause();
+      // الجوال انتهى عدّاده: نعتمد عليه إذا تأخر مؤقت هذا الجهاز (مثلاً الصفحة في الخلفية)
+      else if (c === "timeout" && !run.paused && performance.now() - run.qStart >= total - 1500) mark(false, true);
     } else if (run.phase === "done" && c === "nextStudent") goNext();
   };
   useRemoteHost(remoteState(), onCmd);
@@ -72,12 +76,14 @@ export default function Run({ r }) {
     return {
       phase: run.phase, name: s.name, info: `اختبار ${opName(t.op)} · الجداول ${t.tables.map(n).join("، ")}`, i: run.i, total: run.qs.length,
       q: q ? qText(q) : null, ans: q ? n(qAns(q)) : null, div: q?.op === "div", reveal: !!run.reveal, ok: q?.ok ?? null, to: !!q?.to,
-      paused: !!run.paused, end: q && !run.paused && !run.reveal ? run.endAt : null,
+      // remain: الوقت الباقي لحظة بدء السؤال أو استئنافه، والجوال يعدّ بساعته هو (ساعتا الجهازين قد تختلفان)
+      paused: !!run.paused, remain: q && !run.paused && !run.reveal ? Math.round(run.remain) : null, seg: run.seg || 0,
       left: q && run.paused ? total - (run.pausedAt - run.qStart) : null, secs: t.seconds,
       score: x ? `${n(x.c)}/${n(x.total)}` : null, pct: x ? pct(x.p) : null, next: run.phase !== "q" ? nextStud()?.name || null : null, ar: isAr(),
+      cur: s.id, students: run.phase !== "q" ? studentList(classStudents(t.classId), t) : null,
     };
   }
-  const remoteBtn = remoteAvailable() && <Button variant="outline" size="sm" className="no-print" onClick={() => setQrOpen(true)}><Icon name="phone" /> {remoteToken() ? "باركود الجوال" : "تحكم بالجوال"}</Button>;
+  const remoteBtn = <RemoteButton onClick={() => setQrOpen(true)} />;
   const qrModal = <RemoteQr open={qrOpen} onClose={() => setQrOpen(false)} />;
 
   if (!t || !s) return <Shell title="الاختبار" back={["home"]}><Empty title="الاختبار أو الطالب غير موجود" /></Shell>;
@@ -133,21 +139,5 @@ export default function Run({ r }) {
       {run.paused && <Badge className="bg-warm/30 text-foreground">متوقف مؤقتاً</Badge>}
       {remoteBtn}
     </div>{qrModal}</Shell>
-  );
-}
-
-function RemoteQr({ open, onClose }) {
-  const [tok, setTok] = useState(remoteToken); const [err, setErr] = useState(false);
-  useEffect(() => { if (open && !tok) { setErr(false); remoteCreate().then(setTok).catch(() => setErr(true)); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent dir="rtl" className="no-print flex flex-col items-center text-center sm:max-w-md">
-        <DialogHeader className="items-center sm:text-center"><DialogTitle className="font-display text-xl">تحكم بالجوال</DialogTitle>
-          <DialogDescription>امسح الباركود بكاميرا الجوال، وتحكّم بالاختبار وأنت بعيد عن الشاشة: صح، خطأ، التالي، والطالب التالي.</DialogDescription></DialogHeader>
-        {err ? <p className="text-destructive">تعذّر إنشاء الرابط. تحقّق من الاتصال بالإنترنت.</p>
-          : tok ? <div className="qr" dangerouslySetInnerHTML={{ __html: qrSvg(remoteUrl(tok)) }} /> : <div className="qr"><Spinner label="نجهّز الباركود…" /></div>}
-        <p className="text-sm text-muted-foreground">تبقى النافذة مفتوحة حتى يتصل الجوال، ثم تُغلق تلقائياً.</p>
-      </DialogContent>
-    </Dialog>
   );
 }
