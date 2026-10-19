@@ -121,7 +121,7 @@ export default function Run({ r }) {
       <div className="run-top"><span className="run-name">{s.name}</span><span className="font-display tabular-nums text-muted-foreground">سؤال {n(run.i + 1)} من {n(run.qs.length)}</span>
         {rv ? <span /> : <Button variant="outline" size="sm" onClick={togglePause}>{run.paused ? "متابعة" : "إيقاف مؤقت"}</Button>}</div>
       <div className="prog"><i style={{ width: (run.i * 100) / run.qs.length + "%" }} /></div>
-      <div className={"ring " + (left <= 3000 ? "low" : "")}><svg viewBox="0 0 120 120"><circle className="bg" cx="60" cy="60" r="52" />
+      <div className={"timer-ring " + (left <= 3000 ? "low" : "")}><svg viewBox="0 0 120 120"><circle className="bg" cx="60" cy="60" r="52" />
         <circle className="fg" cx="60" cy="60" r="52" strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - left / total)} /></svg>
         <div className="secs">{n(Math.ceil(left / 1000))}</div></div>
       <div className={"question " + (q.op === "div" ? "div " : "") + (rv ? (q.ok ? "r-ok" : "r-no") : "")} dir="rtl">{qText(q)} = <span className="qa">{rv ? n(qAns(q)) : "؟"}</span></div>

@@ -166,7 +166,7 @@ function SheetDoc({ d }) {
   return <>
     <section className="sheet"><DocHead />
       <h1 className="dtitle">ورقة عمل علاجية · حقائق الضرب</h1>
-      <div className="ws-id"><div>الاسم: <b>{s.name}</b></div><div>الفصل: <b>{c?.name}</b></div><div>التاريخ: </div></div>
+      <div className="ws-id"><div>الاسم: <b>{s.name}</b></div><div>الفصل: <b>{c?.name}</b></div><div /></div>
       <div className="goal"><b>هدفي هذا الأسبوع أن أحفظ:</b> {tg.map((f, i) => <span className="gchip" dir="rtl" key={i}>{n(f.t)} × {n(f.m)} = {n(f.t * f.m)}</span>)}</div>
       <Sec title="١. أرى وأفهم"><p className="hint">كل نقطة تمثل واحداً. نقسم المجموعة الكبيرة إلى جزأين نعرفهما، ثم نجمع.</p>
         <div className="arrays">{tg.slice(0, 3).map((f, i) => { const sp = splitFact(f.t, f.m);
@@ -185,7 +185,6 @@ function SheetDoc({ d }) {
       <Sec title={`٤. أكمل جدول ${n(main)}`}><div className="ladder">{T10.map((m) => <div className="rung" dir="rtl" key={m}><span>{n(main)} × {n(m)}</span><span className="ln" /></div>)}</div></Sec>
       <Sec title="٥. تحدي الدقيقة"><p className="hint">حلّ الأسئلة في دقيقة واحدة. الزمن: ........ ثانية · الصحيح: ........ من {n(12)}</p>
         <div className="blanks c3">{chal.map((q, i) => <div className="blank" dir="rtl" key={i}><span>{q.op === "div" ? `${n(q.t * q.m)} ÷ ${n(q.t)}` : `${n(q.t)} × ${n(q.m)}`} =</span><span className="ln" /></div>)}</div></Sec>
-      <p className="hint"><b>لولي الأمر:</b> عشر دقائق يومياً تكفي. ابدأ بقسم «انظر · غطِّ · اكتب · تحقّق»، ثم تحدي الدقيقة، وامدح التحسن.</p>
       <Sign />
     </section>
   </>;
