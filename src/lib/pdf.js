@@ -26,6 +26,23 @@ function cutPoints(sheet) {
   return cuts;
 }
 
+// دقة الصورة: PNG بثلاثة أضعاف الشاشة حتى يكون النص حاداً عند الطباعة،
+// وضعفين فقط للملفات الكبيرة (أوراق الفصل كله) حتى لا يكبر حجم الملف كثيراً
+const img = (c) => c.toDataURL("image/png");
+
+// النص الذي يظهر في سطر واحد على الشاشة نمنعه من الالتفاف داخل الصورة
+// (قياس الخط داخل الصورة يختلف قليلاً، فكانت كلمات مثل «أخطأ ١ من ٢» تنكسر وتخرج من المربع)
+function lockLines(sheet) {
+  const locked = [];
+  for (const e of sheet.querySelectorAll("*")) {
+    if (!e.childNodes.length || [...e.childNodes].some((n) => n.nodeType === 1 && !/^(B|SPAN|SMALL|STRONG|EM|I)$/.test(n.tagName))) continue;
+    if (!e.textContent.trim()) continue;
+    const cs = getComputedStyle(e); const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4;
+    if (e.getBoundingClientRect().height < lh * 1.6 && cs.whiteSpace !== "nowrap") { locked.push([e, e.style.whiteSpace]); e.style.whiteSpace = "nowrap"; }
+  }
+  return () => locked.forEach(([e, v]) => { e.style.whiteSpace = v; });
+}
+
 let fontCSS = null; // الخطوط المضمّنة تُجهَّز مرة واحدة فقط
 
 // نضمّن خطوط الموقع (العربية واللاتينية فقط) داخل الصورة حتى تظهر كما في الشاشة
@@ -59,12 +76,15 @@ export async function sheetsToPdf(sheets, fileName, onProgress) {
     if (fontCSS == null) fontCSS = await embedFonts().catch(() => "");
     const fontEmbedCSS = fontCSS || undefined;
     const pdf = new jsPDF({ unit: "px", format: [A4W, A4H], hotfixes: ["px_scaling"], compress: true });
+    const SCALE = sheets.length > 8 ? 2 : 3;
     let first = true;
     for (let i = 0; i < sheets.length; i++) {
       onProgress?.(i + 1, sheets.length);
       await new Promise((r) => setTimeout(r, 0)); // نترك المتصفح يحدّث العدّاد
-      const el = sheets[i]; const cuts = cutPoints(el);
-      const canvas = await toCanvas(el, { pixelRatio: 1.6, backgroundColor: "#ffffff", fontEmbedCSS, skipFonts: !fontEmbedCSS, cacheBust: false });
+      const el = sheets[i]; const cuts = cutPoints(el); const unlock = lockLines(el);
+      let canvas;
+      try { canvas = await toCanvas(el, { pixelRatio: SCALE, backgroundColor: "#ffffff", fontEmbedCSS, skipFonts: !fontEmbedCSS, cacheBust: false }); }
+      finally { unlock(); }
       const k = canvas.width / el.offsetWidth;
       // صفحة أطول قليلاً من A4: نصغّرها لتدخل في صفحة واحدة بدل قطعة صغيرة في صفحة جديدة
       const total = cuts[cuts.length - 1];
@@ -72,7 +92,7 @@ export async function sheetsToPdf(sheets, fileName, onProgress) {
         const s = Math.min(1, A4H / total); const w = A4W * s;
         if (!first) pdf.addPage([A4W, A4H]);
         first = false;
-        pdf.addImage(canvas.toDataURL("image/jpeg", 0.82), "JPEG", (A4W - w) / 2, 0, w, total * s, undefined, "FAST");
+        pdf.addImage(img(canvas), "PNG", (A4W - w) / 2, 0, w, total * s, undefined, "FAST");
         continue;
       }
       for (let j = 0; j < cuts.length - 1; j++) {
@@ -81,7 +101,7 @@ export async function sheetsToPdf(sheets, fileName, onProgress) {
         part.getContext("2d").drawImage(canvas, 0, Math.round(y0 * k), canvas.width, part.height, 0, 0, canvas.width, part.height);
         if (!first) pdf.addPage([A4W, A4H]);
         first = false;
-        pdf.addImage(part.toDataURL("image/jpeg", 0.82), "JPEG", 0, j === 0 ? 0 : MARGIN, A4W, h, undefined, "FAST");
+        pdf.addImage(img(part), "PNG", 0, j === 0 ? 0 : MARGIN, A4W, h, undefined, "FAST");
       }
     }
     pdf.save(fileName.replace(/[\\/:*?"<>|]/g, "-") + ".pdf");
