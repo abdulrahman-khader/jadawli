@@ -1,0 +1,110 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ألوان جداولي: أخضر زيتي + برتقالي، والوضع الداكن يتبع الجهاز */
+:root {
+  --radius: 0.85rem;
+  --background: #f0f5f3;
+  --foreground: #15302a;
+  --card: #ffffff;
+  --card-foreground: #15302a;
+  --popover: #ffffff;
+  --popover-foreground: #15302a;
+  --primary: #0f6e5c;
+  --primary-foreground: #ffffff;
+  --secondary: #e0f1eb;
+  --secondary-foreground: #0f4f42;
+  --muted: #eaf1ee;
+  --muted-foreground: #5a6e67;
+  --accent: #e0f1eb;
+  --accent-foreground: #0f4f42;
+  --destructive: #d8432f;
+  --border: #d9e4df;
+  --input: #cfdcd6;
+  --ring: #0f6e5c;
+  --warm: #f59a2e;
+  --warm-foreground: #2b1500;
+  --success: #1e8f50;
+  --div: #2f6fd6;
+  --div-soft: #e4edfc;
+  --band: #0f6e5c;
+  --grid: #e1eae6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0d1a17;
+    --foreground: #e6f0ec;
+    --card: #142521;
+    --card-foreground: #e6f0ec;
+    --popover: #142521;
+    --popover-foreground: #e6f0ec;
+    --primary: #3cc7a5;
+    --primary-foreground: #04241c;
+    --secondary: #18362e;
+    --secondary-foreground: #bfeadd;
+    --muted: #1c302a;
+    --muted-foreground: #9bb0a9;
+    --accent: #18362e;
+    --accent-foreground: #bfeadd;
+    --destructive: #ff6f5c;
+    --border: #24392f;
+    --input: #2c463b;
+    --ring: #3cc7a5;
+    --warm: #ffae45;
+    --warm-foreground: #2b1500;
+    --success: #4cc883;
+    --div: #6fa2ff;
+    --div-soft: #1a2a45;
+    --band: #0f3b31;
+    --grid: #132420;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --font-sans: "Almarai", system-ui, "Segoe UI", Tahoma, sans-serif;
+  --font-display: "Baloo Bhaijaan 2", "Almarai", system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-warm: var(--warm);
+  --color-warm-foreground: var(--warm-foreground);
+  --color-success: var(--success);
+  --color-div: var(--div);
+  --color-div-soft: var(--div-soft);
+  --color-band: var(--band);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html, body { min-height: 100%; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+    line-height: 1.6;
+  }
+  h1, h2, h3 { @apply font-display font-bold; line-height: 1.25; text-wrap: balance; }
+  h1 { @apply text-2xl; }
+  h2 { @apply text-lg; }
+  h3 { @apply text-base; }
+}

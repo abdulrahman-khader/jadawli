@@ -3,17 +3,30 @@ import { db, put, settings } from "../lib/store.js";
 import { go } from "../lib/router.js";
 import { n, uid, toast, T10 } from "../lib/util.js";
 import { classTests, buildPool } from "../lib/stats.js";
-import { Shell, Icon, Empty } from "../components/ui.jsx";
+import { cn } from "../lib/utils.js";
+import { Shell, Icon, Empty, Panel, Btn } from "../components/app.jsx";
+import { Button } from "../components/ui/button.jsx";
+import { Input } from "../components/ui/input.jsx";
+import { Switch } from "../components/ui/switch.jsx";
+import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group.jsx";
 
-const clampV = (v, lo, hi) => Math.min(hi, Math.max(lo, +v || lo));
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, +v || lo));
 function Stepper({ id, value, set, lo, hi }) {
-  const clamp = clampV;
   return (
-    <div className="stepper">
-      <button type="button" className="btn" onClick={() => set(clamp(value - 1, lo, hi))}>−</button>
-      <input id={id} type="number" min={lo} max={hi} value={value} onChange={(e) => set(e.target.value)} onBlur={(e) => set(clamp(e.target.value, lo, hi))} />
-      <button type="button" className="btn" onClick={() => set(clamp(+value + 1, lo, hi))}>+</button>
+    <div className="flex items-center gap-1.5">
+      <Button type="button" variant="outline" size="icon" aria-label="زيادة" onClick={() => set(clamp(+value + 1, lo, hi))}>+</Button>
+      <Input id={id} type="number" min={lo} max={hi} value={value} className="w-20 text-center font-display text-lg" onChange={(e) => set(e.target.value)} onBlur={(e) => set(clamp(e.target.value, lo, hi))} />
+      <Button type="button" variant="outline" size="icon" aria-label="إنقاص" onClick={() => set(clamp(value - 1, lo, hi))}>−</Button>
     </div>
+  );
+}
+// مفتاح تشغيل مع عنوان وشرح (يُستخدم في الإعدادات أيضاً)
+export function SwitchRow({ checked, defaultChecked, onChange, title, desc, name }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-background p-3.5">
+      <Switch checked={checked} defaultChecked={defaultChecked} onCheckedChange={onChange} name={name} className="mt-0.5" />
+      <span><b className="block">{title}</b>{desc && <small className="block text-sm text-muted-foreground">{desc}</small>}</span>
+    </label>
   );
 }
 
@@ -29,41 +42,43 @@ export default function NewTest({ r }) {
   if (!c) return <Shell title="اختبار جديد" back={["home"]}><Empty title="هذا الفصل غير موجود" /></Shell>;
 
   const pool = buildPool(tables, strict); const ex = T10.filter((t) => !tables.includes(t));
-  const toggleT = (t) => setTables((x) => (x.includes(t) ? x.filter((y) => y !== t) : [...x, t].sort((a, b) => a - b)));
-  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, +v || lo));
   function create(e) {
     e.preventDefault();
     if (!tables.length) { toast("اختر جدولاً واحداً على الأقل"); return; }
     const t = { id: uid(), classId: c.id, op, tables: tables.slice().sort((a, b) => a - b), maxM: 10, strict, count: clamp(count, 1, 100), seconds: clamp(seconds, 3, 60), swap, date: Date.now(), results: {} };
-    put("tests", t); go("test", t.id);
+    put("tests", t); toast("أُنشئ الاختبار"); go("test", t.id);
   }
+  const opItem = "h-14 flex-1 rounded-xl border-2 text-base data-[state=on]:text-white";
   return (
     <Shell title="اختبار جديد" back={["class", c.id, "tests"]}>
       <h1>اختبار جديد · {c.name}</h1>
-      <form className="stack" style={{ gap: 16 }} onSubmit={create}>
-        <div className="card"><h3>نوع الاختبار</h3><div className="seg">
-          <label><input type="radio" name="op" value="mul" checked={op === "mul"} onChange={() => setOp("mul")} /><span><b className="sym">×</b> ضرب</span></label>
-          <label><input type="radio" name="op" value="div" checked={op === "div"} onChange={() => setOp("div")} /><span><b className="sym">÷</b> قسمة</span></label>
-        </div></div>
-        <div className="card stack">
-          <div className="between"><h3>الجداول</h3><div className="row">
-            <button type="button" className="btn sm" onClick={() => setTables(T10.slice())}>الكل</button>
-            <button type="button" className="btn sm" onClick={() => setTables([])}>لا شيء</button>
-            <button type="button" className="btn sm" onClick={() => setTables([2, 3, 4, 5])}>٢–٥</button>
-            <button type="button" className="btn sm" onClick={() => setTables([6, 7, 8, 9])}>٦–٩</button>
-          </div></div>
-          <div className="tgrid">{T10.map((t) => <label key={t}><input type="checkbox" checked={tables.includes(t)} onChange={() => toggleT(t)} /><span>{n(t)}</span></label>)}</div>
-          <label className="switch"><input type="checkbox" checked={strict} onChange={(e) => setStrict(e.target.checked)} /><span><b>استبعاد نهائي للجداول غير المختارة</b>
-            <small>عند التشغيل: إذا لم تختر جدول ٥ لن يظهر أي سؤال فيه ٥ أبداً، حتى ٩ × ٥. وعند الإيقاف: قد يظهر ٩ × ٥ ضمن جدول ٩.</small></span></label>
-          <div className="poolbox">{!tables.length ? <span className="hint warn">اختر جدولاً واحداً على الأقل.</span> :
+      <form className="flex flex-col gap-4" onSubmit={create}>
+        <Panel title="نوع الاختبار">
+          <ToggleGroup type="single" value={op} onValueChange={(v) => v && setOp(v)} className="w-full gap-2" dir="rtl">
+            <ToggleGroupItem value="mul" className={cn(opItem, "data-[state=on]:border-primary data-[state=on]:bg-primary")}><b className="font-display text-2xl">×</b> ضرب</ToggleGroupItem>
+            <ToggleGroupItem value="div" className={cn(opItem, "data-[state=on]:border-div data-[state=on]:bg-div")}><b className="font-display text-2xl">÷</b> قسمة</ToggleGroupItem>
+          </ToggleGroup>
+        </Panel>
+        <Panel title="الجداول" action={<div className="flex flex-wrap gap-1.5">
+          <Button type="button" variant="outline" size="sm" onClick={() => setTables(T10.slice())}>الكل</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setTables([])}>لا شيء</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setTables([2, 3, 4, 5])}>٢–٥</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setTables([6, 7, 8, 9])}>٦–٩</Button></div>}>
+          <ToggleGroup type="multiple" value={tables.map(String)} onValueChange={(v) => setTables(v.map(Number).sort((a, b) => a - b))} className="grid w-full grid-cols-5 gap-2.5" dir="rtl">
+            {T10.map((t) => <ToggleGroupItem key={t} value={String(t)} aria-label={"جدول " + t}
+              className="h-15 rounded-xl border-2 border-dashed bg-background font-display text-2xl text-muted-foreground data-[state=on]:border-solid data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md">{n(t)}</ToggleGroupItem>)}
+          </ToggleGroup>
+          <SwitchRow checked={strict} onChange={setStrict} title="استبعاد نهائي للجداول غير المختارة"
+            desc="عند التشغيل: إذا لم تختر جدول ٥ لن يظهر أي سؤال فيه ٥ أبداً، حتى ٩ × ٥. وعند الإيقاف: قد يظهر ٩ × ٥ ضمن جدول ٩." />
+          <div className="rounded-xl bg-secondary px-3.5 py-3 font-bold text-primary">{!tables.length ? <span className="text-destructive">اختر جدولاً واحداً على الأقل.</span> :
             <span>الأسئلة المختلفة المتاحة: {n(pool.length)}{strict && ex.length ? ` · لن يظهر أي سؤال فيه: ${ex.map(n).join("، ")}` : ""}{count > pool.length ? " · سيتكرر بعضها" : ""}</span>}</div>
-        </div>
-        <div className="card stack"><h3>الإعدادات</h3>
-          <div className="between"><span>عدد الأسئلة لكل طالب</span><Stepper id="cnt" value={count} set={setCount} lo={1} hi={100} /></div>
-          <div className="between"><span>زمن السؤال (ثانية)</span><Stepper id="sec" value={seconds} set={setSeconds} lo={3} hi={60} /></div>
-          <label className="switch"><input type="checkbox" checked={swap} onChange={(e) => setSwap(e.target.checked)} /><span><b>خلط ترتيب العددين في الضرب</b><small>مثل ٤ × ٣ بدل ٣ × ٤</small></span></label>
-        </div>
-        <button className="btn primary big"><Icon name="play" /> إنشاء الاختبار</button>
+        </Panel>
+        <Panel title="الإعدادات">
+          <div className="flex flex-wrap items-center justify-between gap-2"><label htmlFor="cnt">عدد الأسئلة لكل طالب</label><Stepper id="cnt" value={count} set={setCount} lo={1} hi={100} /></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><label htmlFor="sec">زمن السؤال (ثانية)</label><Stepper id="sec" value={seconds} set={setSeconds} lo={3} hi={60} /></div>
+          <SwitchRow checked={swap} onChange={setSwap} title="خلط ترتيب العددين في الضرب" desc="مثل ٤ × ٣ بدل ٣ × ٤" />
+        </Panel>
+        <Btn size="xl"><Icon name="play" /> إنشاء الاختبار</Btn>
       </form>
     </Shell>
   );

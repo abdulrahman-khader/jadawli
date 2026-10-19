@@ -1,10 +1,12 @@
 // التخزين: Firebase عند وجود الإعدادات، وإلا وضع تجريبي محلي على الجهاز
 import { FIREBASE_CONFIG } from "../firebase-config.js";
 import { uid, toast, DEFAULT_SETTINGS } from "./util.js";
+import * as F from "./fb.js";
 
 const COLLS = ["classes", "students", "tests", "meta"];
 const empty = () => ({ classes: {}, students: {}, tests: {}, meta: {} });
-export const mode = FIREBASE_CONFIG.apiKey ? "cloud" : "local";
+// VITE_LOCAL=1 يشغّل الوضع التجريبي المحلي للتجربة على الجهاز فقط
+export const mode = FIREBASE_CONFIG.apiKey && !import.meta.env.VITE_LOCAL ? "cloud" : "local";
 
 export const db = { data: empty(), user: null, version: 0 };
 const listeners = new Set();
@@ -29,14 +31,16 @@ export const cloud = () => fbReady;
 export async function boot(onUser) {
   onUserCb = onUser;
   if (mode === "cloud") {
-    const m = await import("./fb.js");
-    fb = m.init(FIREBASE_CONFIG); fbResolve(fb);
-    m.api.onAuthStateChanged(fb.auth, (u) => handleUser(u ? { uid: u.uid, email: u.email, name: u.displayName || "" } : null));
+    fb = F.init(FIREBASE_CONFIG); fbResolve(fb);
+    fb.api.onAuthStateChanged(fb.auth, (u) => handleUser(u ? { uid: u.uid, email: u.email, name: u.displayName || "" } : null));
   } else {
     handleUser(LS.get("mt_session", null));
   }
 }
+let unsubs = [];
+const stopLive = () => { unsubs.forEach((f) => f()); unsubs = []; };
 async function handleUser(u) {
+  stopLive();
   if (!u) { db.user = null; db.data = empty(); onUserCb(null); emit(); return; }
   onUserCb("loading");
   db.user = u;
@@ -77,15 +81,27 @@ export async function logout() {
   LS.del("mt_session"); handleUser(null);
 }
 
+// السحابة: نستمع للبيانات مباشرة. أول مرة تأتي من نسخة الجهاز (فورية) ثم تُحدَّث من الخادم،
+// وأي تعديل من جهاز آخر يظهر تلقائياً
+function loadCloud() {
+  return new Promise((resolve) => {
+    const out = empty(); const ready = new Set(); let done = false;
+    const finish = () => { if (!done) { done = true; clearTimeout(timer); resolve(out); } };
+    const timer = setTimeout(finish, 8000); // بدون إنترنت ولا نسخة محلية
+    const mark = (c) => { ready.add(c); if (ready.size === COLLS.length) finish(); };
+    COLLS.forEach((c) => {
+      unsubs.push(fb.api.onSnapshot(fb.api.collection(fb.db, "users", db.user.uid, c), { includeMetadataChanges: true }, (snap) => {
+        const m = {}; snap.forEach((d) => { m[d.id] = d.data(); });
+        if (!done) { out[c] = m; if (!snap.metadata.fromCache || snap.size) mark(c); }
+        else if (!snap.metadata.hasPendingWrites) { db.data[c] = m; emit(); }
+      }, () => mark(c)));
+    });
+  });
+}
 async function load() {
+  if (mode === "cloud") return loadCloud();
   const out = empty();
-  if (mode === "cloud") {
-    const { api } = fb;
-    await Promise.all(COLLS.map(async (c) => {
-      const snap = await api.getDocs(api.collection(fb.db, "users", db.user.uid, c));
-      snap.forEach((d) => { out[c][d.id] = d.data(); });
-    }));
-  } else {
+  {
     const d = LS.get("mt_data_" + db.user.uid, {});
     COLLS.forEach((c) => Object.assign(out[c], d[c] || {}));
   }

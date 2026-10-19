@@ -27,8 +27,9 @@
 - الشكل: خط Almarai للنص وBaloo Bhaijaan 2 للعناوين والأرقام، ألوان أخضر زيتي (#0F6E5C) مع برتقالي (#F59A2E)، يدعم الوضع الداكن. الصفحة الرئيسية بدون أرقام إحصائية تحت اسم المعلم.
 
 ## التقنية
-- React 18 + Vite 5، بدون مكتبات واجهة. التوجيه بالروابط (`#/class/ID/tab`) في `src/lib/router.js`.
-- `src/lib/store.js`: Firebase إذا وُجدت الإعدادات في `src/firebase-config.js`، وإلا وضع تجريبي محلي (localStorage).
+- React 19 + Vite 5 + Tailwind 4 + مكوّنات shadcn/ui (في `src/components/ui`، معدّلة لـ RTL: end/start بدل right/left). المكوّنات المشتركة للموقع في `src/components/app.jsx` (Btn بأيقونة تحميل، ConfirmButton بنافذة تأكيد، Shell، Panel، List…). الإشعارات عبر Sonner (`toast()` في util.js). الألوان في `src/index.css`، والأنماط الخاصة (الرسوم، شاشة الاختبار، أوراق PDF) في `src/styles.css`. التوجيه بالروابط (`#/class/ID/tab`) في `src/lib/router.js`.
+- `src/lib/store.js`: Firebase إذا وُجدت الإعدادات في `src/firebase-config.js`، وإلا وضع تجريبي محلي (localStorage). للتجربة على الجهاز بدون Firebase: `VITE_LOCAL=1 npx vite` (أو إعداد `jadawli-local` في `.claude/launch.json`).
+- البيانات تُقرأ بـ onSnapshot مع كاش IndexedDB (persistentLocalCache)، فيفتح الموقع فوراً من نسخة الجهاز ثم يتحدّث من الخادم.
 - بنية Firestore: `users/{uid}/{classes|students|tests|meta}/{id}`.
 - قواعد Firestore المطلوبة:
   ```
@@ -54,9 +55,10 @@
 ## الحالة الآن (2026-10-19)
 - الموقع منشور: https://abdulrahman-khader.github.io/jadawli/
 - المستودع: https://github.com/abdulrahman-khader/jadawli (عام، فرع main). أي push على main يعيد النشر تلقائياً.
-- Firebase: مشروع `jadawli` (خطة Spark المجانية)، Email/Password مفعّل، Firestore في eur3 والقواعد أعلاه منشورة، والنطاق `abdulrahman-khader.github.io` مضاف في Authorized domains. الإعدادات في `src/firebase-config.js`.
+- Firebase: مشروع `jadawli` (خطة Spark المجانية)، Email/Password مفعّل، Firestore في me-central2 (الدمام)، أُعيد إنشاؤه في 2026-10-19 وحُذفت بيانات التجربة القديمة بموافقة المعلم والقواعد أعلاه منشورة، والنطاق `abdulrahman-khader.github.io` مضاف في Authorized domains. الإعدادات في `src/firebase-config.js`.
 - المعلم مسجل دخول في Google وGitHub داخل متصفح تطبيق Claude. git push من الجهاز يعمل.
 - Netlify استُخدم سابقاً ووصل حدّه المجاني، فلا تستخدمه.
+- الاستضافة: قِسنا من جهاز المعلم أن GitHub Pages وCloudflare المجاني كلاهما يخدمان السعودية من مرسيليا (MRS)، فالنقل لا يفيد. البطء كان من قاعدة البيانات البعيدة وتحميل الملفات بالتتابع.
 
 ## الخطوة التالية
 - يتأكد المعلم بنفسه من إنشاء حساب في الموقع والحفظ. بعدها أي تعديلات يطلبها: عدّل، `npm run build`، ثم commit وpush.

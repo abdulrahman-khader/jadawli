@@ -3,7 +3,11 @@ import { db, put } from "../lib/store.js";
 import { go } from "../lib/router.js";
 import { n, pct, secs, opName, levelColor, toast, isAr } from "../lib/util.js";
 import { classStudents, makeQuestions, sc, qText, qAns } from "../lib/stats.js";
-import { Shell, Avatar, Stars, Icon, Empty, ConfirmButton } from "../components/ui.jsx";
+import { Shell, Avatar, Stars, Icon, Empty, ConfirmButton, Spinner } from "../components/app.jsx";
+import { Button } from "../components/ui/button.jsx";
+import { Badge } from "../components/ui/badge.jsx";
+import { Card } from "../components/ui/card.jsx";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog.jsx";
 import { remoteAvailable, remoteToken, remoteCreate, remoteUrl, qrSvg, useRemoteHost } from "../lib/remote.js";
 
 const CIRC = 2 * Math.PI * 52;
@@ -73,19 +77,19 @@ export default function Run({ r }) {
       score: x ? `${n(x.c)}/${n(x.total)}` : null, pct: x ? pct(x.p) : null, next: run.phase !== "q" ? nextStud()?.name || null : null, ar: isAr(),
     };
   }
-  const remoteBtn = remoteAvailable() && <button type="button" className="btn sm no-print" onClick={() => setQrOpen(true)}>📱 {remoteToken() ? "باركود الجوال" : "تحكم بالجوال"}</button>;
-  const qrModal = qrOpen && <RemoteQr onClose={() => setQrOpen(false)} />;
+  const remoteBtn = remoteAvailable() && <Button variant="outline" size="sm" className="no-print" onClick={() => setQrOpen(true)}><Icon name="phone" /> {remoteToken() ? "باركود الجوال" : "تحكم بالجوال"}</Button>;
+  const qrModal = <RemoteQr open={qrOpen} onClose={() => setQrOpen(false)} />;
 
   if (!t || !s) return <Shell title="الاختبار" back={["home"]}><Empty title="الاختبار أو الطالب غير موجود" /></Shell>;
   const back = ["test", t.id];
 
   if (run.phase === "ready") return (
     <Shell title="الاختبار" back={back}><div className="run">
-      <Avatar name={s.name} /><h1 style={{ fontSize: "2.2rem" }}>{s.name}</h1>
-      <p className="muted">اختبار {opName(t.op)} · الجداول {t.tables.map(n).join("، ")}</p>
+      <Avatar name={s.name} className="size-16 rounded-2xl text-2xl" /><h1 className="text-4xl">{s.name}</h1>
+      <p className="text-muted-foreground">اختبار {opName(t.op)} · الجداول {t.tables.map(n).join("، ")}</p>
       <p>{n(run.qs.length)} سؤالاً · {n(t.seconds)} ثوانٍ لكل سؤال. إذا انتهى الوقت يُحسب السؤال خطأ.</p>
-      <button type="button" className="btn yellow big" style={{ fontSize: "1.3rem", padding: 18 }} disabled={!run.qs.length}
-        onClick={() => { run.phase = "q"; begin(); }}><Icon name="play" /> ابدأ الآن</button>
+      <Button variant="warm" size="xl" className="h-16 text-xl" disabled={!run.qs.length}
+        onClick={() => { run.phase = "q"; begin(); }}><Icon name="play" /> ابدأ الآن</Button>
       {remoteBtn}
     </div>{qrModal}</Shell>
   );
@@ -97,13 +101,14 @@ export default function Run({ r }) {
       <Shell title="انتهى الاختبار" back={back}><div className="run">
         <h1>{s.name}</h1><div className="done-score" style={{ color: levelColor(x.p) }}>{n(x.c)}/{n(x.total)}</div>
         <p>{pct(x.p)} · متوسط زمن الإجابة {secs(x.avgMs)}</p><Stars p={x.p} />
-        {wrong.length ? <div className="card" style={{ width: "100%", textAlign: "right" }}><h3>الأسئلة الخاطئة</h3>
-          <div className="facts">{wrong.map((q, i) => <div className="fact bad" key={i}><b dir="rtl">{qText(q)} = {n(qAns(q))}</b><small>{q.to ? "انتهى الوقت" : "إجابة خاطئة"}</small></div>)}</div></div>
-          : <p className="chip good">كل الإجابات صحيحة!</p>}
-        {nx ? <button type="button" className="btn yellow big" onClick={() => go("run", t.id, null, nx.id, { replace: true })}>الطالب التالي: {nx.name}</button> : <p className="chip good">اختُبر جميع الطلاب</p>}
-        <div className="row" style={{ justifyContent: "center" }}>
-          <button type="button" className="btn" onClick={() => go("result", t.id, null, s.id)}>مراجعة وتعديل الدرجة</button>
-          <button type="button" className="btn" onClick={() => go("test", t.id)}>قائمة الطلاب</button>
+        {wrong.length ? <Card className="w-full gap-3 p-5 text-start"><h3>الأسئلة الخاطئة</h3>
+          <div className="facts">{wrong.map((q, i) => <div className="fact bad" key={i}><b dir="rtl">{qText(q)} = {n(qAns(q))}</b><small>{q.to ? "انتهى الوقت" : "إجابة خاطئة"}</small></div>)}</div></Card>
+          : <Badge className="bg-success/15 px-3 py-1 text-base text-success">كل الإجابات صحيحة!</Badge>}
+        {nx ? <Button variant="warm" size="xl" onClick={() => go("run", t.id, null, nx.id, { replace: true })}>الطالب التالي: {nx.name}</Button>
+          : <Badge className="bg-success/15 px-3 py-1 text-base text-success">اختُبر جميع الطلاب</Badge>}
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button variant="outline" onClick={() => go("result", t.id, null, s.id)}>مراجعة وتعديل الدرجة</Button>
+          <Button variant="outline" onClick={() => go("test", t.id)}>قائمة الطلاب</Button>
         </div>
         {remoteBtn}
       </div>{qrModal}</Shell>
@@ -113,34 +118,36 @@ export default function Run({ r }) {
   const q = run.qs[run.i]; const rv = run.reveal; const left = run.paused ? total - (run.pausedAt - run.qStart) : run.left;
   return (
     <Shell title="الاختبار" back={back}><div className="run">
-      <div className="run-top"><span className="run-name">{s.name}</span><span className="muted num">سؤال {n(run.i + 1)} من {n(run.qs.length)}</span>
-        {rv ? <span /> : <button type="button" className="btn sm" onClick={togglePause}>{run.paused ? "متابعة" : "إيقاف مؤقت"}</button>}</div>
+      <div className="run-top"><span className="run-name">{s.name}</span><span className="font-display tabular-nums text-muted-foreground">سؤال {n(run.i + 1)} من {n(run.qs.length)}</span>
+        {rv ? <span /> : <Button variant="outline" size="sm" onClick={togglePause}>{run.paused ? "متابعة" : "إيقاف مؤقت"}</Button>}</div>
       <div className="prog"><i style={{ width: (run.i * 100) / run.qs.length + "%" }} /></div>
       <div className={"ring " + (left <= 3000 ? "low" : "")}><svg viewBox="0 0 120 120"><circle className="bg" cx="60" cy="60" r="52" />
         <circle className="fg" cx="60" cy="60" r="52" strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - left / total)} /></svg>
         <div className="secs">{n(Math.ceil(left / 1000))}</div></div>
       <div className={"question " + (q.op === "div" ? "div " : "") + (rv ? (q.ok ? "r-ok" : "r-no") : "")} dir="rtl">{qText(q)} = <span className="qa">{rv ? n(qAns(q)) : "؟"}</span></div>
       {rv ? <div className={"reveal " + (q.ok ? "ok" : "no")}><b>{q.to ? "انتهى الوقت" : q.ok ? "✓ إجابة صحيحة" : "✗ إجابة خاطئة"}</b>
-        <button type="button" className="btn" onClick={next}>{run.i + 1 < run.qs.length ? "السؤال التالي" : "عرض النتيجة"}</button></div>
+        <Button variant="outline" size="lg" onClick={next}>{run.i + 1 < run.qs.length ? "السؤال التالي" : "عرض النتيجة"}</Button></div>
         : <div className="marks"><button type="button" className="mk ok" onClick={() => mark(true, false)}>✓ صح</button><button type="button" className="mk no" onClick={() => mark(false, false)}>✗ خطأ</button></div>}
-      <ConfirmButton className="btn sm danger" confirmText="تأكيد إلغاء محاولة الطالب" onConfirm={() => go("test", t.id)}>إلغاء المحاولة</ConfirmButton>
-      {run.paused && <p className="chip warn">متوقف مؤقتاً</p>}
+      <ConfirmButton variant="ghost" className="text-destructive" confirmText="إلغاء محاولة الطالب؟" desc="لن تُحفظ إجاباته في هذه المحاولة." action="إلغاء المحاولة"
+        onConfirm={() => go("test", t.id)}>إلغاء المحاولة</ConfirmButton>
+      {run.paused && <Badge className="bg-warm/30 text-foreground">متوقف مؤقتاً</Badge>}
       {remoteBtn}
     </div>{qrModal}</Shell>
   );
 }
 
-function RemoteQr({ onClose }) {
+function RemoteQr({ open, onClose }) {
   const [tok, setTok] = useState(remoteToken); const [err, setErr] = useState(false);
-  useEffect(() => { if (!tok) remoteCreate().then(setTok).catch(() => setErr(true)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open && !tok) { setErr(false); remoteCreate().then(setTok).catch(() => setErr(true)); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="modal no-print" onClick={onClose}><div className="modal-card card" onClick={(e) => e.stopPropagation()}>
-      <h2>تحكم بالجوال</h2>
-      <p className="muted">امسح الباركود بكاميرا الجوال، وتحكّم بالاختبار وأنت بعيد عن الشاشة: صح، خطأ، التالي، والطالب التالي.</p>
-      {err ? <p className="err">تعذّر إنشاء الرابط. تحقّق من الاتصال بالإنترنت.</p>
-        : tok ? <div className="qr" dangerouslySetInnerHTML={{ __html: qrSvg(remoteUrl(tok)) }} /> : <div className="qr wait">جارٍ التجهيز…</div>}
-      <p className="hint">تبقى النافذة مفتوحة حتى يتصل الجوال، ثم تُغلق تلقائياً.</p>
-      <button type="button" className="btn" onClick={onClose}>إغلاق</button>
-    </div></div>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent dir="rtl" className="no-print flex flex-col items-center text-center sm:max-w-md">
+        <DialogHeader className="items-center sm:text-center"><DialogTitle className="font-display text-xl">تحكم بالجوال</DialogTitle>
+          <DialogDescription>امسح الباركود بكاميرا الجوال، وتحكّم بالاختبار وأنت بعيد عن الشاشة: صح، خطأ، التالي، والطالب التالي.</DialogDescription></DialogHeader>
+        {err ? <p className="text-destructive">تعذّر إنشاء الرابط. تحقّق من الاتصال بالإنترنت.</p>
+          : tok ? <div className="qr" dangerouslySetInnerHTML={{ __html: qrSvg(remoteUrl(tok)) }} /> : <div className="qr"><Spinner label="نجهّز الباركود…" /></div>}
+        <p className="text-sm text-muted-foreground">تبقى النافذة مفتوحة حتى يتصل الجوال، ثم تُغلق تلقائياً.</p>
+      </DialogContent>
+    </Dialog>
   );
 }

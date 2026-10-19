@@ -1,14 +1,15 @@
 import { useReducer } from "react";
 import { db, settings, displayName } from "../lib/store.js";
 import { go, bulk } from "../lib/router.js";
-import { n, pct, secs, opName, fmtDate, shuffle, scoreColor, T10 } from "../lib/util.js";
+import { n, pct, secs, opName, fmtDate, shuffle, scoreColor, T10, toast } from "../lib/util.js";
 import { testStats, sc, qText, classStudents, classAgg, reportIds, periodText, studentAgg } from "../lib/stats.js";
 import { planData, TRICKS, explainFact, splitFact, targetFacts } from "../lib/plan.js";
-import { Icon, Kpi } from "../components/ui.jsx";
+import { Icon, Kpi, Logo, Btn, useBusy, nextFrame } from "../components/app.jsx";
+import { Button } from "../components/ui/button.jsx";
 import { HBars, ColChart, LineChart, HeatMap, Facts } from "../components/charts.jsx";
 
 const DocHead = () => (
-  <div className="dh"><div className="dh-brand"><span className="logo">×÷</span><div><b>{settings().school || "جداولي"}</b><span>المعلم: {displayName()}</span></div></div>
+  <div className="dh"><div className="dh-brand"><Logo /><div><b>{settings().school || "جداولي"}</b><span>المعلم: {displayName()}</span></div></div>
     <div className="dh-date">{fmtDate(Date.now())}</div></div>
 );
 const Sec = ({ title, children }) => <div className="dsec"><h2>{title}</h2>{children}</div>;
@@ -191,6 +192,9 @@ function SheetDoc({ d }) {
 
 export default function DocView({ r }) {
   const [seed, reroll] = useReducer((x) => x + 1, 0);
+  const [printing, runPrint] = useBusy();
+  // نعرض أيقونة التحميل أولاً ثم نفتح نافذة الطباعة (قد تأخذ ثوانٍ مع الأوراق الكثيرة)
+  const savePdf = () => runPrint(async () => { await nextFrame(); await document.fonts?.ready; window.print(); });
   const kind = r.tab, id = r.id; let title = "", back = ["home"], body = null, extra = null;
   if (kind === "test" && db.data.tests[id]) { title = "تقرير الاختبار"; back = ["test", id]; body = <TestDoc t={db.data.tests[id]} />; }
   else if (kind === "class" && db.data.classes[id]) { title = "تقرير الفصل"; back = ["class", id, "report"]; body = <ClassDoc cid={id} />; }
@@ -200,19 +204,19 @@ export default function DocView({ r }) {
     const ds = ids.map(planData).filter(Boolean);
     title = `أوراق العمل · ${n(ds.length)} طالب`; back = ["bulk", id];
     body = ds.map((d) => <SheetDoc key={d.s.id + seed} d={d} />);
-    extra = <button type="button" className="btn sm" onClick={reroll}>أسئلة جديدة</button>;
+    extra = <Button variant="ghost" size="sm" className="bg-white/14 text-white hover:bg-white/24 hover:text-white" onClick={() => { reroll(); toast("أُنشئت أسئلة جديدة"); }}><Icon name="refresh" /> أسئلة جديدة</Button>;
   } else if ((kind === "plan" || kind === "sheet") && planData(id)) {
     const d = planData(id); back = ["student", id];
-    if (kind === "plan") { title = "الخطة العلاجية"; body = <PlanDoc d={d} />; extra = <button type="button" className="btn sm" onClick={() => go("doc", id, "sheet")}><Icon name="sheet" /> ورقة العمل</button>; }
-    else { title = "ورقة العمل"; body = <SheetDoc key={seed} d={d} />; extra = <button type="button" className="btn sm" onClick={reroll}>أسئلة جديدة</button>; }
+    if (kind === "plan") { title = "الخطة العلاجية"; body = <PlanDoc d={d} />; extra = <Button variant="ghost" size="sm" className="bg-white/14 text-white hover:bg-white/24 hover:text-white" onClick={() => go("doc", id, "sheet")}><Icon name="sheet" /> ورقة العمل</Button>; }
+    else { title = "ورقة العمل"; body = <SheetDoc key={seed} d={d} />; extra = <Button variant="ghost" size="sm" className="bg-white/14 text-white hover:bg-white/24 hover:text-white" onClick={() => { reroll(); toast("أُنشئت أسئلة جديدة"); }}><Icon name="refresh" /> أسئلة جديدة</Button>; }
   } else body = <section className="sheet"><p>لا يوجد ما يُعرض.</p></section>;
   return (
     <>
-      <header className="bar docbar"><div className="bar-in">
-        <button type="button" className="icon-btn" aria-label="رجوع" onClick={() => go(...back)}><Icon name="back" /></button>
-        <div className="bar-title">{title}</div>{extra}
-        <button type="button" className="btn sm yellow" onClick={() => window.print()}><Icon name="print" /> حفظ PDF</button>
-        <div className="doc-help">اضغط «حفظ PDF» ثم اختر في نافذة الطباعة: «حفظ بتنسيق PDF» أو «Save as PDF».</div>
+      <header className="no-print sticky top-0 z-20 bg-band pt-[env(safe-area-inset-top)] text-white shadow-sm"><div className="mx-auto flex max-w-4xl flex-wrap items-center gap-3 px-4 py-3">
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/15 hover:text-white" aria-label="رجوع" onClick={() => go(...back)}><Icon name="back" className="size-5" /></Button>
+        <div className="min-w-0 flex-1 truncate font-display text-lg font-semibold">{title}</div>{extra}
+        <Btn variant="warm" size="sm" loading={printing} onClick={savePdf}>{!printing && <Icon name="print" />} {printing ? "نجهّز الملف…" : "حفظ PDF"}</Btn>
+        <div className="w-full text-sm opacity-85">اضغط «حفظ PDF» ثم اختر في نافذة الطباعة: «حفظ بتنسيق PDF» أو «Save as PDF».</div>
       </div></header>
       <main className="doc">{body}</main>
     </>

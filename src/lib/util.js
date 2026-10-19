@@ -1,3 +1,4 @@
+import { toast as sonner } from "sonner";
 // أدوات عامة: تنسيق الأرقام والتواريخ وغيرها
 export const DEFAULT_SETTINGS = { digits: "arab", count: 10, seconds: 10, swap: false, strict: false, school: "" };
 let CFG = { ...DEFAULT_SETTINGS };
@@ -32,7 +33,8 @@ export function downloadCSV(name, rows) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
-// إشعار صغير أسفل الشاشة
-const toastListeners = new Set();
-export const onToast = (f) => { toastListeners.add(f); return () => toastListeners.delete(f); };
-export const toast = (msg) => toastListeners.forEach((f) => f(msg));
+// الإشعارات (Sonner): رسائل الخطأ تظهر بالأحمر، والباقي بعلامة نجاح
+export const toast = (msg, kind) => {
+  const k = kind || (/^(تعذّر|حدث خطأ)/.test(msg) ? "error" : /^(اختر|اكتب)/.test(msg) ? "warning" : "success");
+  return sonner[k](msg);
+};

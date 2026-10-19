@@ -1,50 +1,65 @@
 import { useState } from "react";
 import { login, register, resetPassword, mode, AUTH_ERR } from "../lib/store.js";
 import { toast } from "../lib/util.js";
+import { Btn, Logo } from "../components/app.jsx";
+import { Card } from "../components/ui/card.jsx";
+import { Input } from "../components/ui/input.jsx";
+import { Label } from "../components/ui/label.jsx";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
+import { Button } from "../components/ui/button.jsx";
+
+const Field = ({ id, label, ...p }) => <div className="grid gap-2"><Label htmlFor={id}>{label}</Label><Input id={id} className="h-11" {...p} /></div>;
 
 export default function Auth() {
   const [m, setM] = useState("login");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // عند النجاح تبقى أيقونة التحميل حتى تفتح الصفحة الرئيسية
   async function submit(e, fn) {
     e.preventDefault(); const fd = new FormData(e.currentTarget);
     setBusy(true); setErr("");
-    try { await fn(fd); } catch (x) { setErr(AUTH_ERR[x?.code] || "حدث خطأ. حاول مرة أخرى."); } finally { setBusy(false); }
+    try { await fn(fd); } catch (x) { setErr(AUTH_ERR[x?.code] || "حدث خطأ. حاول مرة أخرى."); setBusy(false); }
   }
   const switchTo = (k) => { setM(k); setErr(""); };
+  const err_ = <p className="min-h-5 text-sm text-destructive" role="alert">{err}</p>;
 
   return (
-    <>
-      {mode === "local" && <div className="demo">وضع تجريبي: الحسابات والبيانات محفوظة على هذا الجهاز فقط.</div>}
-      <div className="auth"><div className="auth-card">
-        <div className="brand"><span className="logo big">×÷</span><h1>جداولي</h1><p>اختبارات جدول الضرب والقسمة لفصولك، مع تقارير وخطة علاجية لكل طالب.</p></div>
-        {m !== "reset" && <div className="tabs">
-          <button type="button" className={"tab " + (m === "login" ? "on" : "")} onClick={() => switchTo("login")}>تسجيل الدخول</button>
-          <button type="button" className={"tab " + (m === "register" ? "on" : "")} onClick={() => switchTo("register")}>حساب جديد</button>
-        </div>}
-        {m === "login" && <form className="card stack" onSubmit={(e) => submit(e, (fd) => login(fd.get("email"), fd.get("pass")))}>
-          <div><label className="lbl" htmlFor="lEmail">البريد الإلكتروني</label><input id="lEmail" name="email" type="email" required autoComplete="email" dir="ltr" /></div>
-          <div><label className="lbl" htmlFor="lPass">كلمة المرور</label><input id="lPass" name="pass" type="password" required autoComplete="current-password" dir="ltr" /></div>
-          <button className="btn primary big" disabled={busy}>دخول</button>
-          <button type="button" className="link" onClick={() => switchTo("reset")}>نسيت كلمة المرور؟</button>
-          <p className="err" role="alert">{err}</p>
-        </form>}
-        {m === "register" && <form className="card stack" onSubmit={(e) => submit(e, (fd) => register(String(fd.get("name")).trim(), fd.get("email"), fd.get("pass")))}>
-          <div><label className="lbl" htmlFor="rName">اسمك</label><input id="rName" name="name" type="text" required maxLength={40} placeholder="مثال: أ. محمد" /></div>
-          <div><label className="lbl" htmlFor="rEmail">البريد الإلكتروني</label><input id="rEmail" name="email" type="email" required autoComplete="email" dir="ltr" /></div>
-          <div><label className="lbl" htmlFor="rPass">كلمة المرور (٦ أحرف أو أكثر)</label><input id="rPass" name="pass" type="password" required minLength={6} autoComplete="new-password" dir="ltr" /></div>
-          <button className="btn primary big" disabled={busy}>إنشاء الحساب</button>
-          <p className="err" role="alert">{err}</p>
-        </form>}
-        {m === "reset" && <form className="card stack" onSubmit={(e) => submit(e, async (fd) => { await resetPassword(fd.get("email")); toast("أرسلنا رابط تعيين كلمة المرور إلى بريدك"); })}>
-          <p className="muted">اكتب بريدك وسنرسل لك رابطاً لتعيين كلمة مرور جديدة.</p>
-          <div><label className="lbl" htmlFor="pEmail">البريد الإلكتروني</label><input id="pEmail" name="email" type="email" required dir="ltr" /></div>
-          <button className="btn primary big" disabled={busy}>إرسال الرابط</button>
-          <button type="button" className="link" onClick={() => switchTo("login")}>العودة لتسجيل الدخول</button>
-          <p className="err" role="alert">{err}</p>
-        </form>}
-      </div></div>
-    </>
+    <div className="grid min-h-dvh place-items-center bg-band px-4 py-8">
+      {mode === "local" && <div className="fixed inset-x-0 top-0 bg-warm py-1.5 text-center text-sm text-warm-foreground">وضع تجريبي: الحسابات والبيانات محفوظة على هذا الجهاز فقط.</div>}
+      <div className="flex w-full max-w-md flex-col gap-5">
+        <div className="flex flex-col items-center gap-2.5 text-center text-white"><Logo big /><h1 className="text-4xl">جداولي</h1>
+          <p className="opacity-80">اختبارات جدول الضرب والقسمة لفصولك، مع تقارير وخطة علاجية لكل طالب.</p></div>
+        {m !== "reset" && <Tabs value={m} onValueChange={switchTo} dir="rtl">
+          <TabsList className="grid h-11 w-full grid-cols-2 bg-white/12">
+            <TabsTrigger value="login" className="text-white/85 data-[state=active]:text-foreground">تسجيل الدخول</TabsTrigger>
+            <TabsTrigger value="register" className="text-white/85 data-[state=active]:text-foreground">حساب جديد</TabsTrigger>
+          </TabsList>
+        </Tabs>}
+        <Card className="gap-4 p-6">
+          {m === "login" && <form className="flex flex-col gap-4" onSubmit={(e) => submit(e, (fd) => login(fd.get("email"), fd.get("pass")))}>
+            <Field id="lEmail" label="البريد الإلكتروني" name="email" type="email" required autoComplete="email" dir="ltr" />
+            <Field id="lPass" label="كلمة المرور" name="pass" type="password" required autoComplete="current-password" dir="ltr" />
+            <Btn size="xl" loading={busy}>{busy ? "جارٍ الدخول…" : "دخول"}</Btn>
+            <Button type="button" variant="link" onClick={() => switchTo("reset")}>نسيت كلمة المرور؟</Button>
+            {err_}
+          </form>}
+          {m === "register" && <form className="flex flex-col gap-4" onSubmit={(e) => submit(e, (fd) => register(String(fd.get("name")).trim(), fd.get("email"), fd.get("pass")))}>
+            <Field id="rName" label="اسمك" name="name" type="text" required maxLength={40} placeholder="مثال: أ. محمد" />
+            <Field id="rEmail" label="البريد الإلكتروني" name="email" type="email" required autoComplete="email" dir="ltr" />
+            <Field id="rPass" label="كلمة المرور (٦ أحرف أو أكثر)" name="pass" type="password" required minLength={6} autoComplete="new-password" dir="ltr" />
+            <Btn size="xl" loading={busy}>{busy ? "جارٍ إنشاء الحساب…" : "إنشاء الحساب"}</Btn>
+            {err_}
+          </form>}
+          {m === "reset" && <form className="flex flex-col gap-4" onSubmit={(e) => submit(e, async (fd) => { await resetPassword(fd.get("email")); setBusy(false); toast("أرسلنا رابط تعيين كلمة المرور إلى بريدك"); })}>
+            <p className="text-muted-foreground">اكتب بريدك وسنرسل لك رابطاً لتعيين كلمة مرور جديدة.</p>
+            <Field id="pEmail" label="البريد الإلكتروني" name="email" type="email" required dir="ltr" />
+            <Btn size="xl" loading={busy}>إرسال الرابط</Btn>
+            <Button type="button" variant="link" onClick={() => switchTo("login")}>العودة لتسجيل الدخول</Button>
+            {err_}
+          </form>}
+        </Card>
+      </div>
+    </div>
   );
 }
