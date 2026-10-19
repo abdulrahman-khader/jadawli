@@ -1,5 +1,5 @@
 // صفحة الجوال: تحكم عن بعد بالاختبار المعروض على الشاشة (لا تحتاج تسجيل دخول)
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { remoteAvailable, useRemoteClient } from "../lib/remote.js";
 import { ConfirmButton } from "../components/ui.jsx";
 
@@ -17,6 +17,9 @@ function RemoteInner({ tok }) {
   const [d, send] = useRemoteClient(tok);
   const [, tick] = useReducer((x) => x + 1, 0);
   const said = useRef(false);
+  // إظهار الجواب في الجوال قبل الإجابة (يُحفظ على هذا الجوال)
+  const [showAns, setShowAns] = useState(() => { try { return localStorage.getItem("mt_remote_ans") !== "0"; } catch { return true; } });
+  const toggleAns = () => { const v = !showAns; setShowAns(v); try { localStorage.setItem("mt_remote_ans", v ? "1" : "0"); } catch { /* ignore */ } };
   useEffect(() => { const id = setInterval(tick, 250); return () => clearInterval(id); }, []);
   useEffect(() => { if (d && !said.current) { said.current = true; send("hello").catch(() => {}); } }, [d]); // eslint-disable-line react-hooks/exhaustive-deps
   // إبقاء شاشة الجوال مضاءة
@@ -48,14 +51,17 @@ function RemoteInner({ tok }) {
         <div className="remote-top"><b>{s.name}</b><span className="muted">سؤال {ar(s.i + 1)} من {ar(s.total)}</span></div>
         <div className="prog"><i style={{ width: (s.i * 100) / s.total + "%" }} /></div>
         <div className={"question remote-q " + (s.div ? "div " : "") + (s.reveal ? (s.ok ? "r-ok" : "r-no") : "")} dir="rtl">
-          {s.q} = <span className="qa">{s.ans}</span></div>
+          {s.q} = <span className="qa">{showAns || s.reveal ? s.ans : "؟"}</span></div>
         {s.reveal ? <>
           <p className={"remote-res " + (s.ok ? "ok" : "no")}>{s.to ? "انتهى الوقت" : s.ok ? "✓ صحيحة" : "✗ خاطئة"}</p>
           <button type="button" className="btn primary remote-big" onClick={() => press("next")}>{s.i + 1 < s.total ? "السؤال التالي" : "عرض النتيجة"}</button>
         </> : <>
           <p className={"remote-secs " + (left <= 3000 ? "low" : "")}>{s.paused ? "متوقف" : ar(Math.ceil(left / 1000))}</p>
           <div className="marks remote-marks"><button type="button" className="mk ok" onClick={() => press("ok")}>✓ صح</button><button type="button" className="mk no" onClick={() => press("no")}>✗ خطأ</button></div>
-          <button type="button" className="btn" onClick={() => press("pause")}>{s.paused ? "متابعة" : "إيقاف مؤقت"}</button>
+          <div className="row" style={{ justifyContent: "center" }}>
+            <button type="button" className="btn" onClick={() => press("pause")}>{s.paused ? "متابعة" : "إيقاف مؤقت"}</button>
+            <button type="button" className="btn" onClick={toggleAns}>{showAns ? "إخفاء الجواب" : "إظهار الجواب"}</button>
+          </div>
         </>}
       </Box>
     );
