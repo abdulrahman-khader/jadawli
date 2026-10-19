@@ -13,7 +13,6 @@ export default defineConfig({
         // مكتبات كبيرة في ملفات منفصلة يحتفظ بها المتصفح بين التحديثات
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
-          if (id.includes("@firebase/firestore")) return "firestore";
           if (id.includes("firebase")) return "firebase";
           if (id.includes("react-dom") || id.includes("/react/") || id.includes("scheduler")) return "react";
           return "ui";
