@@ -1,0 +1,99 @@
+import { useEffect, useReducer, useRef } from "react";
+import { db, put } from "../lib/store.js";
+import { go } from "../lib/router.js";
+import { n, pct, secs, opName, levelColor } from "../lib/util.js";
+import { classStudents, makeQuestions, sc, qText, qAns } from "../lib/stats.js";
+import { Shell, Avatar, Stars, Icon, Empty, ConfirmButton } from "../components/ui.jsx";
+
+const CIRC = 2 * Math.PI * 52;
+const REVEAL_MS = 1500;
+
+export default function Run({ r }) {
+  const t = db.data.tests[r.id]; const s = db.data.students[r.id2];
+  const R = useRef(null);
+  if (!R.current && t) R.current = { phase: "ready", qs: makeQuestions(t), i: 0, paused: false, reveal: false, qStart: 0, pausedAt: 0, left: t.seconds * 1000, tok: 0 };
+  const [, force] = useReducer((x) => x + 1, 0);
+  const run = R.current; const total = (t?.seconds || 10) * 1000;
+
+  const begin = () => { run.qStart = performance.now(); run.left = total; run.paused = false; run.reveal = false; force(); };
+  const finish = () => { t.results = t.results || {}; t.results[s.id] = { status: "done", items: run.qs, at: Date.now() }; put("tests", t); run.phase = "done"; force(); window.scrollTo(0, 0); };
+  const next = () => { if (!run.reveal) return; run.reveal = false; run.i++; if (run.i >= run.qs.length) finish(); else begin(); };
+  const mark = (ok, timeout) => {
+    if (run.phase !== "q" || run.reveal || run.paused) return;
+    const q = run.qs[run.i]; q.ok = !!ok; q.to = !!timeout; q.ms = Math.round(Math.min(total, performance.now() - run.qStart));
+    run.left = Math.max(0, total - q.ms); run.reveal = true; force();
+    const tok = ++run.tok; setTimeout(() => { if (R.current === run && run.reveal && run.tok === tok) next(); }, REVEAL_MS);
+  };
+  const togglePause = () => {
+    if (run.reveal) return;
+    if (run.paused) { run.qStart += performance.now() - run.pausedAt; run.paused = false; } else { run.paused = true; run.pausedAt = performance.now(); }
+    force();
+  };
+  // المؤقت
+  const fns = useRef({}); fns.current = { mark, next };
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!run || run.phase !== "q" || run.paused || run.reveal) return;
+      run.left = Math.max(0, total - (performance.now() - run.qStart));
+      if (run.left <= 0) fns.current.mark(false, true); else force();
+    }, 100);
+    const key = (e) => {
+      if (!run || run.phase !== "q") return;
+      if (run.reveal) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fns.current.next(); } return; }
+      if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); fns.current.mark(true, false); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); fns.current.mark(false, false); }
+    };
+    window.addEventListener("keydown", key);
+    return () => { clearInterval(id); window.removeEventListener("keydown", key); if (run) run.tok++; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!t || !s) return <Shell title="الاختبار" back={["home"]}><Empty title="الاختبار أو الطالب غير موجود" /></Shell>;
+  const back = ["test", t.id];
+
+  if (run.phase === "ready") return (
+    <Shell title="الاختبار" back={back}><div className="run">
+      <Avatar name={s.name} /><h1 style={{ fontSize: "2.2rem" }}>{s.name}</h1>
+      <p className="muted">اختبار {opName(t.op)} · الجداول {t.tables.map(n).join("، ")}</p>
+      <p>{n(run.qs.length)} سؤالاً · {n(t.seconds)} ثوانٍ لكل سؤال. إذا انتهى الوقت يُحسب السؤال خطأ.</p>
+      <button type="button" className="btn yellow big" style={{ fontSize: "1.3rem", padding: 18 }} disabled={!run.qs.length}
+        onClick={() => { run.phase = "q"; begin(); }}><Icon name="play" /> ابدأ الآن</button>
+    </div></Shell>
+  );
+
+  if (run.phase === "done") {
+    const x = sc(t.results[s.id]); const nx = classStudents(t.classId).find((z) => !t.results?.[z.id]);
+    const wrong = t.results[s.id].items.filter((q) => !q.ok);
+    return (
+      <Shell title="انتهى الاختبار" back={back}><div className="run">
+        <h1>{s.name}</h1><div className="done-score" style={{ color: levelColor(x.p) }}>{n(x.c)}/{n(x.total)}</div>
+        <p>{pct(x.p)} · متوسط زمن الإجابة {secs(x.avgMs)}</p><Stars p={x.p} />
+        {wrong.length ? <div className="card" style={{ width: "100%", textAlign: "right" }}><h3>الأسئلة الخاطئة</h3>
+          <div className="facts">{wrong.map((q, i) => <div className="fact bad" key={i}><b dir="rtl">{qText(q)} = {n(qAns(q))}</b><small>{q.to ? "انتهى الوقت" : "إجابة خاطئة"}</small></div>)}</div></div>
+          : <p className="chip good">كل الإجابات صحيحة!</p>}
+        {nx ? <button type="button" className="btn yellow big" onClick={() => go("run", t.id, null, nx.id, { replace: true })}>الطالب التالي: {nx.name}</button> : <p className="chip good">اختُبر جميع الطلاب</p>}
+        <div className="row" style={{ justifyContent: "center" }}>
+          <button type="button" className="btn" onClick={() => go("result", t.id, null, s.id)}>مراجعة وتعديل الدرجة</button>
+          <button type="button" className="btn" onClick={() => go("test", t.id)}>قائمة الطلاب</button>
+        </div>
+      </div></Shell>
+    );
+  }
+
+  const q = run.qs[run.i]; const rv = run.reveal; const left = run.paused ? total - (run.pausedAt - run.qStart) : run.left;
+  return (
+    <Shell title="الاختبار" back={back}><div className="run">
+      <div className="run-top"><span className="run-name">{s.name}</span><span className="muted num">سؤال {n(run.i + 1)} من {n(run.qs.length)}</span>
+        {rv ? <span /> : <button type="button" className="btn sm" onClick={togglePause}>{run.paused ? "متابعة" : "إيقاف مؤقت"}</button>}</div>
+      <div className="prog"><i style={{ width: (run.i * 100) / run.qs.length + "%" }} /></div>
+      <div className={"ring " + (left <= 3000 ? "low" : "")}><svg viewBox="0 0 120 120"><circle className="bg" cx="60" cy="60" r="52" />
+        <circle className="fg" cx="60" cy="60" r="52" strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - left / total)} /></svg>
+        <div className="secs">{n(Math.ceil(left / 1000))}</div></div>
+      <div className={"question " + (q.op === "div" ? "div " : "") + (rv ? (q.ok ? "r-ok" : "r-no") : "")} dir="rtl">{qText(q)} = <span className="qa">{rv ? n(qAns(q)) : "؟"}</span></div>
+      {rv ? <div className={"reveal " + (q.ok ? "ok" : "no")}><b>{q.to ? "انتهى الوقت" : q.ok ? "✓ إجابة صحيحة" : "✗ إجابة خاطئة"}</b>
+        <button type="button" className="btn" onClick={next}>{run.i + 1 < run.qs.length ? "السؤال التالي" : "عرض النتيجة"}</button></div>
+        : <div className="marks"><button type="button" className="mk ok" onClick={() => mark(true, false)}>✓ صح</button><button type="button" className="mk no" onClick={() => mark(false, false)}>✗ خطأ</button></div>}
+      <ConfirmButton className="btn sm danger" confirmText="تأكيد إلغاء محاولة الطالب" onConfirm={() => go("test", t.id)}>إلغاء المحاولة</ConfirmButton>
+      {run.paused && <p className="chip warn">متوقف مؤقتاً</p>}
+    </div></Shell>
+  );
+}
