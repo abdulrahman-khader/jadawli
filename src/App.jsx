@@ -11,6 +11,7 @@ import TestView, { Result } from "./views/TestView.jsx";
 import Run from "./views/Run.jsx";
 import { Student, Bulk, Settings } from "./views/Student.jsx";
 import DocView from "./views/Docs.jsx";
+import Remote from "./views/Remote.jsx";
 
 const VIEWS = { home: Home, class: ClassView, newTest: NewTest, test: TestView, result: Result, run: Run, student: Student, bulk: Bulk, settings: Settings, doc: DocView };
 
@@ -28,6 +29,7 @@ export default function App() {
   useEffect(() => { boot(setUser).catch(() => setUser("error")); }, []);
 
   setCfg(settings());
+  if (route.name === "remote") return <Remote r={route} key={route.id} />; // صفحة الجوال لا تحتاج تسجيل دخول
   if (user === undefined || user === "loading") return <div className="loading">جارٍ التحميل…</div>;
   if (user === "error") return <div className="auth"><div className="auth-card card"><h2>تعذّر الاتصال بـ Firebase</h2><p className="muted">تأكد من اتصال الإنترنت ومن صحة الإعدادات في ملف firebase-config.js.</p></div></div>;
   if (!user) return <><Auth /><Toasts /></>;

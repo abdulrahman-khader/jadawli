@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, sendPasswordResetEmail, updateProfile,
 } from "firebase/auth";
-import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot } from "firebase/firestore";
 
 export function init(cfg) {
   const app = initializeApp(cfg);
@@ -12,5 +12,5 @@ export function init(cfg) {
 }
 export const api = {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
-  sendPasswordResetEmail, updateProfile, collection, doc, getDocs, setDoc, deleteDoc,
+  sendPasswordResetEmail, updateProfile, collection, doc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot,
 };

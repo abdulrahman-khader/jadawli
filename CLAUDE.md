@@ -22,6 +22,7 @@
 - ورقة العمل العلاجية PDF (صفحتان): هدف الأسبوع، «أرى وأفهم» برسم نقاط مقسوم، «انظر·غطِّ·اكتب·تحقّق»، مثلث العائلة، أكمل الجدول، تحدي الدقيقة.
   - **محذوف بطلب المعلم**: مفتاح الإجابة، ولوحة التقدم (جدول الأيام الخمسة). لا ترجعهما.
 - أوراق عمل جماعية لكل الفصل دفعة واحدة مع إمكانية استثناء طلاب.
+- التحكم بالجوال: زر «تحكم بالجوال» في شاشة الاختبار يعرض باركود. الجوال يفتح `#/remote/TOKEN` بدون تسجيل دخول ويتحكم (ابدأ/غائب/صح/خطأ/إيقاف/التالي/الطالب التالي). يعمل عبر مستند `remotes/{token}` في Firestore (`src/lib/remote.js`، `src/views/Remote.jsx`). الرمز يُحفظ في sessionStorage فيبقى الجوال متصلاً بين الطلاب.
 - الإعدادات: اسم المعلم، اسم المدرسة (يظهر في التقارير)، أرقام عربية/لاتينية، الافتراضيات.
 - الشكل: خط Almarai للنص وBaloo Bhaijaan 2 للعناوين والأرقام، ألوان أخضر زيتي (#0F6E5C) مع برتقالي (#F59A2E)، يدعم الوضع الداكن. الصفحة الرئيسية بدون أرقام إحصائية تحت اسم المعلم.
 
@@ -36,6 +37,13 @@
     match /databases/{db}/documents {
       match /users/{uid}/{doc=**} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+      match /remotes/{id} {
+        allow get: if true;
+        allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
+        allow update: if (request.auth != null && resource.data.owner == request.auth.uid)
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cmd']);
+        allow delete: if request.auth != null && resource.data.owner == request.auth.uid;
       }
     }
   }

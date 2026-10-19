@@ -21,13 +21,16 @@ async function sha(s) {
   catch { return "p:" + s; }
 }
 
-let fb = null, onUserCb = null, pendingName = null;
+let fb = null, onUserCb = null, pendingName = null, fbResolve;
+// اتصال Firebase نفسه لصفحات لا تحتاج تسجيل دخول (تحكم الجوال)
+const fbReady = new Promise((r) => { fbResolve = r; });
+export const cloud = () => fbReady;
 
 export async function boot(onUser) {
   onUserCb = onUser;
   if (mode === "cloud") {
     const m = await import("./fb.js");
-    fb = m.init(FIREBASE_CONFIG);
+    fb = m.init(FIREBASE_CONFIG); fbResolve(fb);
     m.api.onAuthStateChanged(fb.auth, (u) => handleUser(u ? { uid: u.uid, email: u.email, name: u.displayName || "" } : null));
   } else {
     handleUser(LS.get("mt_session", null));

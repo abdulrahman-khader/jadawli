@@ -1,9 +1,10 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { db, put } from "../lib/store.js";
 import { go } from "../lib/router.js";
-import { n, pct, secs, opName, levelColor } from "../lib/util.js";
+import { n, pct, secs, opName, levelColor, toast, isAr } from "../lib/util.js";
 import { classStudents, makeQuestions, sc, qText, qAns } from "../lib/stats.js";
 import { Shell, Avatar, Stars, Icon, Empty, ConfirmButton } from "../components/ui.jsx";
+import { remoteAvailable, remoteToken, remoteCreate, remoteUrl, qrSvg, useRemoteHost } from "../lib/remote.js";
 
 const CIRC = 2 * Math.PI * 52;
 const REVEAL_MS = 1500;
@@ -15,7 +16,7 @@ export default function Run({ r }) {
   const [, force] = useReducer((x) => x + 1, 0);
   const run = R.current; const total = (t?.seconds || 10) * 1000;
 
-  const begin = () => { run.qStart = performance.now(); run.left = total; run.paused = false; run.reveal = false; force(); };
+  const begin = () => { run.qStart = performance.now(); run.left = total; run.endAt = Date.now() + total; run.paused = false; run.reveal = false; force(); };
   const finish = () => { t.results = t.results || {}; t.results[s.id] = { status: "done", items: run.qs, at: Date.now() }; put("tests", t); run.phase = "done"; force(); window.scrollTo(0, 0); };
   const next = () => { if (!run.reveal) return; run.reveal = false; run.i++; if (run.i >= run.qs.length) finish(); else begin(); };
   const mark = (ok, timeout) => {
@@ -26,7 +27,7 @@ export default function Run({ r }) {
   };
   const togglePause = () => {
     if (run.reveal) return;
-    if (run.paused) { run.qStart += performance.now() - run.pausedAt; run.paused = false; } else { run.paused = true; run.pausedAt = performance.now(); }
+    if (run.paused) { run.qStart += performance.now() - run.pausedAt; run.paused = false; run.endAt = Date.now() + total - (performance.now() - run.qStart); } else { run.paused = true; run.pausedAt = performance.now(); }
     force();
   };
   // المؤقت
@@ -47,6 +48,34 @@ export default function Run({ r }) {
     return () => { clearInterval(id); window.removeEventListener("keydown", key); if (run) run.tok++; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // تحكم الجوال
+  const [qrOpen, setQrOpen] = useState(false);
+  const nextStud = () => (t ? classStudents(t.classId).find((z) => !t.results?.[z.id] && z.id !== s?.id) : null);
+  const goNext = () => { const nx = nextStud(); if (nx) go("run", t.id, null, nx.id, { replace: true }); else go("test", t.id); };
+  const onCmd = (c) => {
+    if (c === "hello") { setQrOpen(false); toast("تم ربط الجوال ✓"); return; }
+    if (run.phase === "ready") {
+      if (c === "start" && run.qs.length) { run.phase = "q"; begin(); }
+      else if (c === "absent") { t.results = t.results || {}; t.results[s.id] = { status: "absent", at: Date.now() }; put("tests", t); goNext(); }
+    } else if (run.phase === "q") {
+      if (c === "ok") mark(true, false); else if (c === "no") mark(false, false); else if (c === "next") next(); else if (c === "pause") togglePause();
+    } else if (run.phase === "done" && c === "nextStudent") goNext();
+  };
+  useRemoteHost(remoteState(), onCmd);
+  function remoteState() {
+    if (!t || !s || !run) return { phase: "idle" };
+    const q = run.phase === "q" ? run.qs[run.i] : null; const x = run.phase === "done" ? sc(t.results[s.id]) : null;
+    return {
+      phase: run.phase, name: s.name, info: `اختبار ${opName(t.op)} · الجداول ${t.tables.map(n).join("، ")}`, i: run.i, total: run.qs.length,
+      q: q ? qText(q) : null, ans: q ? n(qAns(q)) : null, div: q?.op === "div", reveal: !!run.reveal, ok: q?.ok ?? null, to: !!q?.to,
+      paused: !!run.paused, end: q && !run.paused && !run.reveal ? run.endAt : null,
+      left: q && run.paused ? total - (run.pausedAt - run.qStart) : null, secs: t.seconds,
+      score: x ? `${n(x.c)}/${n(x.total)}` : null, pct: x ? pct(x.p) : null, next: run.phase !== "q" ? nextStud()?.name || null : null, ar: isAr(),
+    };
+  }
+  const remoteBtn = remoteAvailable() && <button type="button" className="btn sm no-print" onClick={() => setQrOpen(true)}>📱 {remoteToken() ? "باركود الجوال" : "تحكم بالجوال"}</button>;
+  const qrModal = qrOpen && <RemoteQr onClose={() => setQrOpen(false)} />;
+
   if (!t || !s) return <Shell title="الاختبار" back={["home"]}><Empty title="الاختبار أو الطالب غير موجود" /></Shell>;
   const back = ["test", t.id];
 
@@ -57,7 +86,8 @@ export default function Run({ r }) {
       <p>{n(run.qs.length)} سؤالاً · {n(t.seconds)} ثوانٍ لكل سؤال. إذا انتهى الوقت يُحسب السؤال خطأ.</p>
       <button type="button" className="btn yellow big" style={{ fontSize: "1.3rem", padding: 18 }} disabled={!run.qs.length}
         onClick={() => { run.phase = "q"; begin(); }}><Icon name="play" /> ابدأ الآن</button>
-    </div></Shell>
+      {remoteBtn}
+    </div>{qrModal}</Shell>
   );
 
   if (run.phase === "done") {
@@ -75,7 +105,8 @@ export default function Run({ r }) {
           <button type="button" className="btn" onClick={() => go("result", t.id, null, s.id)}>مراجعة وتعديل الدرجة</button>
           <button type="button" className="btn" onClick={() => go("test", t.id)}>قائمة الطلاب</button>
         </div>
-      </div></Shell>
+        {remoteBtn}
+      </div>{qrModal}</Shell>
     );
   }
 
@@ -94,6 +125,22 @@ export default function Run({ r }) {
         : <div className="marks"><button type="button" className="mk ok" onClick={() => mark(true, false)}>✓ صح</button><button type="button" className="mk no" onClick={() => mark(false, false)}>✗ خطأ</button></div>}
       <ConfirmButton className="btn sm danger" confirmText="تأكيد إلغاء محاولة الطالب" onConfirm={() => go("test", t.id)}>إلغاء المحاولة</ConfirmButton>
       {run.paused && <p className="chip warn">متوقف مؤقتاً</p>}
-    </div></Shell>
+      {remoteBtn}
+    </div>{qrModal}</Shell>
+  );
+}
+
+function RemoteQr({ onClose }) {
+  const [tok, setTok] = useState(remoteToken); const [err, setErr] = useState(false);
+  useEffect(() => { if (!tok) remoteCreate().then(setTok).catch(() => setErr(true)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="modal no-print" onClick={onClose}><div className="modal-card card" onClick={(e) => e.stopPropagation()}>
+      <h2>تحكم بالجوال</h2>
+      <p className="muted">امسح الباركود بكاميرا الجوال، وتحكّم بالاختبار وأنت بعيد عن الشاشة: صح، خطأ، التالي، والطالب التالي.</p>
+      {err ? <p className="err">تعذّر إنشاء الرابط. تحقّق من الاتصال بالإنترنت.</p>
+        : tok ? <div className="qr" dangerouslySetInnerHTML={{ __html: qrSvg(remoteUrl(tok)) }} /> : <div className="qr wait">جارٍ التجهيز…</div>}
+      <p className="hint">تبقى النافذة مفتوحة حتى يتصل الجوال، ثم تُغلق تلقائياً.</p>
+      <button type="button" className="btn" onClick={onClose}>إغلاق</button>
+    </div></div>
   );
 }

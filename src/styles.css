@@ -375,3 +375,21 @@ table.tracker{border-collapse:collapse;font-size:.68rem;width:auto!important;tab
   .sheet{box-shadow:none;max-width:none;padding:0;border-radius:0}
   .sheet + .sheet{break-before:page}
 }
+
+/* remote control (phone) */
+.modal{position:fixed;inset:0;z-index:50;background:rgb(0 0 0 / .55);display:grid;place-items:center;padding:16px}
+.modal-card{width:100%;max-width:420px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.qr{width:min(280px,80vw);aspect-ratio:1;background:#fff;border-radius:16px;padding:8px;display:grid;place-items:center;color:#333}
+.qr svg{width:100%;height:100%;display:block}
+.remote{min-height:100vh;min-height:100dvh;padding:20px 16px max(20px,env(safe-area-inset-bottom,0px));display:flex;justify-content:center}
+.remote-in{width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center}
+.remote-name{font-size:2rem}
+.remote-top{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:var(--f-display);font-size:1.1rem}
+.remote-q{font-size:clamp(2.4rem,13vw,4rem);padding:18px 14px}
+.remote-q .qa{color:var(--muted)}
+.remote-secs{font-family:var(--f-display);font-size:2.4rem;font-weight:700;line-height:1;margin:0}
+.remote-secs.low{color:var(--bad)}
+.remote-res{font-family:var(--f-display);font-size:1.6rem;font-weight:700;margin:0}
+.remote-res.ok{color:var(--good)} .remote-res.no{color:var(--bad)}
+.remote-marks .mk{padding:44px 10px;font-size:2rem}
+.remote-big{width:100%;padding:22px;font-size:1.4rem}
