@@ -1,12 +1,11 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { db, put } from "../lib/store.js";
 import { go } from "../lib/router.js";
-import { n, pct, secs, opName, levelColor, toast, isAr } from "../lib/util.js";
+import { n, pct, secs, opName, toast, isAr } from "../lib/util.js";
 import { classStudents, makeQuestions, sc, qText, qAns } from "../lib/stats.js";
-import { Shell, Avatar, Stars, Icon, Empty, ConfirmButton } from "../components/app.jsx";
+import { Shell, Avatar, Icon, Empty, ConfirmButton } from "../components/app.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { Badge } from "../components/ui/badge.jsx";
-import { Card } from "../components/ui/card.jsx";
 import { useRemoteHost } from "../lib/remote.js";
 import { RemoteButton, RemoteQr, studentList } from "../components/remote-qr.jsx";
 
@@ -79,7 +78,8 @@ export default function Run({ r }) {
       // remain: الوقت الباقي لحظة بدء السؤال أو استئنافه، والجوال يعدّ بساعته هو (ساعتا الجهازين قد تختلفان)
       paused: !!run.paused, remain: q && !run.paused && !run.reveal ? Math.round(run.remain) : null, seg: run.seg || 0,
       left: q && run.paused ? total - (run.pausedAt - run.qStart) : null, secs: t.seconds,
-      score: x ? `${n(x.c)}/${n(x.total)}` : null, pct: x ? pct(x.p) : null, next: run.phase !== "q" ? nextStud()?.name || null : null, ar: isAr(),
+      score: x ? `${n(x.c)}/${n(x.total)}` : null, pct: x ? pct(x.p) : null, avg: x ? secs(x.avgMs) : null,
+      wrong: x ? t.results[s.id].items.filter((w) => !w.ok).map((w) => ({ q: qText(w), a: n(qAns(w)), to: !!w.to })) : null, next: run.phase !== "q" ? nextStud()?.name || null : null, ar: isAr(),
       cur: s.id, students: run.phase !== "q" ? studentList(classStudents(t.classId), t) : null,
     };
   }
@@ -101,15 +101,13 @@ export default function Run({ r }) {
   );
 
   if (run.phase === "done") {
-    const x = sc(t.results[s.id]); const nx = classStudents(t.classId).find((z) => !t.results?.[z.id]);
-    const wrong = t.results[s.id].items.filter((q) => !q.ok);
+    // الدرجة لا تظهر على الشاشة المعروضة للطلاب: تظهر في جوال المعلم، وفي صفحة الاختبار والتقارير
+    const nx = classStudents(t.classId).find((z) => !t.results?.[z.id]);
     return (
       <Shell title="انتهى الاختبار" back={back}><div className="run">
-        <h1>{s.name}</h1><div className="done-score" style={{ color: levelColor(x.p) }}>{n(x.c)}/{n(x.total)}</div>
-        <p>{pct(x.p)} · متوسط زمن الإجابة {secs(x.avgMs)}</p><Stars p={x.p} />
-        {wrong.length ? <Card className="w-full gap-3 p-5 text-start"><h3>الأسئلة الخاطئة</h3>
-          <div className="facts">{wrong.map((q, i) => <div className="fact bad" key={i}><b dir="rtl">{qText(q)} = {n(qAns(q))}</b><small>{q.to ? "انتهى الوقت" : "إجابة خاطئة"}</small></div>)}</div></Card>
-          : <Badge className="bg-success/15 px-3 py-1 text-base text-success">كل الإجابات صحيحة!</Badge>}
+        <Avatar name={s.name} className="size-16 rounded-2xl text-2xl" /><h1 className="text-4xl">{s.name}</h1>
+        <div className="grid size-20 place-items-center rounded-full bg-success/15 text-5xl text-success">✓</div>
+        <p className="font-display text-2xl font-bold">انتهى اختبارك، شكراً لك</p>
         {nx ? <Button variant="warm" size="xl" onClick={() => go("run", t.id, null, nx.id, { replace: true })}>الطالب التالي: {nx.name}</Button>
           : <Badge className="bg-success/15 px-3 py-1 text-base text-success">اختُبر جميع الطلاب</Badge>}
         <div className="flex flex-wrap justify-center gap-2">

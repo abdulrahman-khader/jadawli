@@ -130,7 +130,11 @@ function RemoteInner({ tok }) {
   if (s.phase === "done") return (
     <Box>
       <h1 className="remote-name">{s.name}</h1>
-      <div className="done-score">{s.score}</div><p className="text-muted-foreground">{s.pct}</p>
+      <Badge variant="outline">الدرجة تظهر لك فقط، لا تظهر على الشاشة</Badge>
+      <div className="done-score">{s.score}</div><p className="text-muted-foreground">{s.pct}{s.avg && <> · متوسط الزمن {s.avg}</>}</p>
+      {s.wrong?.length ? <div className="w-full rounded-xl border bg-card p-4 text-start"><b>الأسئلة الخاطئة</b>
+        <div className="facts mt-2">{s.wrong.map((w, i) => <div className="fact bad" key={i}><b dir="rtl">{w.q} = {w.a}</b><small>{w.to ? "انتهى الوقت" : "إجابة خاطئة"}</small></div>)}</div></div>
+        : s.wrong && <Badge className="bg-success/15 px-3 py-1 text-base text-success">كل الإجابات صحيحة!</Badge>}
       {s.next ? <Button variant="warm" size="xl" className="h-16 text-xl" disabled={!!sent} onClick={() => press("nextStudent")}>{spin("nextStudent", `الطالب التالي: ${s.next}`)}</Button>
         : <Badge className="bg-success/15 px-3 py-1 text-base text-success">اختُبر جميع الطلاب</Badge>}
       <Students list={s.students} cur={s.cur} onPick={pick} disabled={!!sent} />
