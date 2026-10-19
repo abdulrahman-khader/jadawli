@@ -41,19 +41,14 @@
   }
   ```
 - النشر: `.github/workflows/deploy.yml` يبني وينشر على GitHub Pages عند كل push على main. `vite.config.js` فيه `base: "./"`.
-- **لم يُشغَّل `npm install` ولا `vite build` بعد** (البيئة السابقة لم تصل لـ npm). الكود جُرّب ببناء esbuild ويعمل. أول شيء: `npm install` ثم `npm run build` وأصلح أي خطأ.
+- البناء `npm run build` يعمل بدون أخطاء.
 
-## الحالة الآن
-- الكود جاهز في هذا المجلد.
-- لم يُنشأ بعد: مشروع Firebase، مستودع GitHub، النشر.
+## الحالة الآن (2026-10-19)
+- الموقع منشور: https://abdulrahman-khader.github.io/jadawli/
+- المستودع: https://github.com/abdulrahman-khader/jadawli (عام، فرع main). أي push على main يعيد النشر تلقائياً.
+- Firebase: مشروع `jadawli` (خطة Spark المجانية)، Email/Password مفعّل، Firestore في eur3 والقواعد أعلاه منشورة، والنطاق `abdulrahman-khader.github.io` مضاف في Authorized domains. الإعدادات في `src/firebase-config.js`.
+- المعلم مسجل دخول في Google وGitHub داخل متصفح تطبيق Claude. git push من الجهاز يعمل.
 - Netlify استُخدم سابقاً ووصل حدّه المجاني، فلا تستخدمه.
-- المعلم غير مسجل دخول في GitHub ولا Google داخل متصفح تطبيق Claude. تسجيل الدخول وإنشاء الحسابات وكتابة كلمات المرور يقوم بها هو بنفسه.
 
 ## الخطوة التالية
-0. ملف النشر التلقائي موجود في `setup/deploy.yml` (لم يمكن نسخه مباشرة إلى `.github`). انقله إلى `.github/workflows/deploy.yml` ثم احذف مجلد `setup`.
-1. `npm install` ثم `npm run build` وتأكد أنه ينجح، وجرّب `npm run dev`.
-2. بعد أن يسجّل المعلم دخوله في GitHub وGoogle:
-   - أنشئ مشروع Firebase (استأذنه قبل الموافقة على الشروط)، فعّل Email/Password، أنشئ Firestore وضع القواعد أعلاه، وانسخ إعدادات تطبيق الويب إلى `src/firebase-config.js`.
-   - أنشئ مستودع `jadawli` عاماً، ارفع المشروع، وفعّل Settings ← Pages ← Source: GitHub Actions.
-   - أضف `اسم-المستخدم.github.io` في Firebase ← Authentication ← Settings ← Authorized domains.
-3. أعطه الرابط النهائي وتأكد أن التسجيل والحفظ يعملان.
+- يتأكد المعلم بنفسه من إنشاء حساب في الموقع والحفظ. بعدها أي تعديلات يطلبها: عدّل، `npm run build`، ثم commit وpush.
