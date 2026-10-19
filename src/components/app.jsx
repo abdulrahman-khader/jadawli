@@ -2,7 +2,7 @@
 import { useState } from "react";
 import {
   ArrowRight, Settings, Plus, FileText, NotebookPen, Trash2, Play, Printer, FileSpreadsheet, Loader2,
-  Smartphone, LogOut, Pencil, Users, ClipboardList, BarChart3, Trophy, RefreshCw, UserX, Check, X,
+  Smartphone, LogOut, Pencil, Users, ClipboardList, BarChart3, Trophy, RefreshCw, UserX, Check, X, Download,
 } from "lucide-react";
 import { go } from "../lib/router.js";
 import { mode } from "../lib/store.js";
@@ -18,7 +18,7 @@ import {
 const ICONS = {
   back: ArrowRight, gear: Settings, plus: Plus, pdf: FileText, sheet: NotebookPen, trash: Trash2, play: Play,
   print: Printer, xls: FileSpreadsheet, phone: Smartphone, logout: LogOut, edit: Pencil, users: Users,
-  tests: ClipboardList, chart: BarChart3, trophy: Trophy, refresh: RefreshCw, absent: UserX, check: Check, x: X,
+  tests: ClipboardList, chart: BarChart3, trophy: Trophy, refresh: RefreshCw, absent: UserX, check: Check, x: X, download: Download,
 };
 export const Icon = ({ name, className }) => { const C = ICONS[name] || Plus; return <C className={className} aria-hidden="true" />; };
 
@@ -37,7 +37,7 @@ export function useBusy() {
   return [busy, run];
 }
 // يعطي المتصفح فرصة لرسم أيقونة التحميل قبل عمل ثقيل (طباعة، تصدير)
-export const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+export const nextFrame = () => new Promise((r) => { requestAnimationFrame(() => setTimeout(r, 30)); setTimeout(r, 120); }); // المهلة احتياط إذا كانت الصفحة مخفية
 
 export function Spinner({ className, label }) {
   return <span className={cn("inline-flex items-center gap-2 text-muted-foreground", className)} role="status"><Loader2 className="size-5 animate-spin" aria-hidden="true" />{label}</span>;

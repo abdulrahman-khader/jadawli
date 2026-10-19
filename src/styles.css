@@ -233,3 +233,13 @@ table.tracker{border-collapse:collapse;font-size:.68rem;width:auto!important;tab
 .remote-res.ok{color:var(--good)} .remote-res.no{color:var(--bad)}
 .remote-marks .mk{padding:44px 10px;font-size:2rem}
 .remote-big{width:100%;padding:22px;font-size:1.4rem}
+
+/* أثناء إنشاء ملف PDF: الصفحات بمقاس A4 الثابت مهما كان حجم الشاشة */
+.doc.capture .sheet{width:794px!important;max-width:794px!important;padding:36px 40px!important;border-radius:0;box-shadow:none;flex:none}
+.doc.capture .kpis{grid-template-columns:repeat(4,1fr)}
+.doc.capture .learn,.doc.capture .fams,.doc.capture .blanks{grid-template-columns:repeat(2,1fr)}
+.doc.capture .blanks.c3{grid-template-columns:repeat(3,1fr)}
+.doc.capture .blanks.c4{grid-template-columns:repeat(4,1fr)}
+.doc.capture .arrays{grid-template-columns:repeat(3,1fr)}
+.doc.capture .ladder{grid-template-columns:repeat(5,1fr)}
+.gchip,.lcard .eq,.acard .eq,.fact b,.blank > span:first-child,.rung > span:first-child{white-space:nowrap}

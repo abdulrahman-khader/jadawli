@@ -1,10 +1,11 @@
-import { useReducer } from "react";
+import { useReducer, useState } from "react";
 import { db, settings, displayName } from "../lib/store.js";
 import { go, bulk } from "../lib/router.js";
 import { n, pct, secs, opName, fmtDate, shuffle, scoreColor, T10, toast } from "../lib/util.js";
 import { testStats, sc, qText, classStudents, classAgg, reportIds, periodText, studentAgg } from "../lib/stats.js";
 import { planData, TRICKS, explainFact, splitFact, targetFacts } from "../lib/plan.js";
-import { Icon, Kpi, Logo, Btn, useBusy, nextFrame } from "../components/app.jsx";
+import { Icon, Kpi, Logo, Btn, useBusy, nextFrame, Spinner } from "../components/app.jsx";
+import { Progress } from "../components/ui/progress.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { HBars, ColChart, LineChart, HeatMap, Facts } from "../components/charts.jsx";
 
@@ -193,8 +194,20 @@ function SheetDoc({ d }) {
 export default function DocView({ r }) {
   const [seed, reroll] = useReducer((x) => x + 1, 0);
   const [printing, runPrint] = useBusy();
-  // نعرض أيقونة التحميل أولاً ثم نفتح نافذة الطباعة (قد تأخذ ثوانٍ مع الأوراق الكثيرة)
-  const savePdf = () => runPrint(async () => { await nextFrame(); await document.fonts?.ready; window.print(); });
+  const [prog, setProg] = useState(null); // [الصفحة الحالية، عدد الصفحات] أثناء إنشاء الملف
+  // تنزيل PDF مباشرة: أسرع من نافذة الطباعة، ونعرض تقدّم العمل صفحة بصفحة
+  const download = async () => {
+    if (prog) return;
+    setProg([0, 0]); await nextFrame();
+    try {
+      const { sheetsToPdf } = await import("../lib/pdf.js");
+      const sheets = [...document.querySelectorAll(".doc .sheet")];
+      await sheetsToPdf(sheets, fileName, (i, k) => setProg([i, k]));
+      toast("نُزّل ملف PDF");
+    } catch { toast("تعذّر إنشاء الملف. جرّب زر «طباعة» بدلاً منه"); }
+    finally { setProg(null); }
+  };
+  const printNow = () => runPrint(async () => { await nextFrame(); await document.fonts?.ready; window.print(); });
   const kind = r.tab, id = r.id; let title = "", back = ["home"], body = null, extra = null;
   if (kind === "test" && db.data.tests[id]) { title = "تقرير الاختبار"; back = ["test", id]; body = <TestDoc t={db.data.tests[id]} />; }
   else if (kind === "class" && db.data.classes[id]) { title = "تقرير الفصل"; back = ["class", id, "report"]; body = <ClassDoc cid={id} />; }
@@ -210,15 +223,23 @@ export default function DocView({ r }) {
     if (kind === "plan") { title = "الخطة العلاجية"; body = <PlanDoc d={d} />; extra = <Button variant="ghost" size="sm" className="bg-white/14 text-white hover:bg-white/24 hover:text-white" onClick={() => go("doc", id, "sheet")}><Icon name="sheet" /> ورقة العمل</Button>; }
     else { title = "ورقة العمل"; body = <SheetDoc key={seed} d={d} />; extra = <Button variant="ghost" size="sm" className="bg-white/14 text-white hover:bg-white/24 hover:text-white" onClick={() => { reroll(); toast("أُنشئت أسئلة جديدة"); }}><Icon name="refresh" /> أسئلة جديدة</Button>; }
   } else body = <section className="sheet"><p>لا يوجد ما يُعرض.</p></section>;
+  const who = kind === "test" ? `${db.data.classes[db.data.tests[id]?.classId]?.name || ""} ${new Date(db.data.tests[id]?.date || 0).toISOString().slice(0, 10)}`
+    : kind === "class" || kind === "sheets" ? db.data.classes[id]?.name : db.data.students[id]?.name;
+  const fileName = `${title.split(" · ")[0]} - ${who || ""}`.trim();
   return (
     <>
       <header className="no-print sticky top-0 z-20 bg-band pt-[env(safe-area-inset-top)] text-white shadow-sm"><div className="mx-auto flex max-w-4xl flex-wrap items-center gap-3 px-4 py-3">
         <Button variant="ghost" size="icon" className="text-white hover:bg-white/15 hover:text-white" aria-label="رجوع" onClick={() => go(...back)}><Icon name="back" className="size-5" /></Button>
         <div className="min-w-0 flex-1 truncate font-display text-lg font-semibold">{title}</div>{extra}
-        <Btn variant="warm" size="sm" loading={printing} onClick={savePdf}>{!printing && <Icon name="print" />} {printing ? "نجهّز الملف…" : "حفظ PDF"}</Btn>
-        <div className="w-full text-sm opacity-85">اضغط «حفظ PDF» ثم اختر في نافذة الطباعة: «حفظ بتنسيق PDF» أو «Save as PDF».</div>
+        <Btn variant="ghost" size="sm" className="bg-white/14 text-white hover:bg-white/24 hover:text-white" loading={printing} disabled={!!prog} onClick={printNow}>{!printing && <Icon name="print" />} طباعة</Btn>
+        <Btn variant="warm" size="sm" loading={!!prog} onClick={download}>{!prog && <Icon name="download" />} {prog ? (prog[1] > 1 ? `صفحة ${n(prog[0])} من ${n(prog[1])}…` : "نجهّز الملف…") : "تنزيل PDF"}</Btn>
       </div></header>
       <main className="doc">{body}</main>
+      {prog && <div className="no-print fixed inset-0 z-50 grid place-items-center bg-background/85 backdrop-blur-sm" role="status" aria-live="polite">
+        <div className="flex w-72 flex-col items-center gap-3 rounded-2xl border bg-card p-6 text-center shadow-lg">
+          <Spinner className="text-primary" /><b className="font-display text-lg">نجهّز ملف PDF</b>
+          {prog[1] > 0 && <><Progress value={(prog[0] / prog[1]) * 100} className="w-full" /><span className="text-sm text-muted-foreground">صفحة {n(prog[0])} من {n(prog[1])}</span></>}
+        </div></div>}
     </>
   );
 }

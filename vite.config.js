@@ -13,6 +13,7 @@ export default defineConfig({
         // مكتبات كبيرة في ملفات منفصلة يحتفظ بها المتصفح بين التحديثات
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
+          if (/jspdf|html-to-image|html2canvas|canvg|dompurify|fflate|core-js|raf|rgbcolor|stackblur|svg-pathdata|performance-now|@babel/.test(id)) return; // مكتبات PDF تُحمَّل عند الحاجة فقط
           if (id.includes("firebase")) return "firebase";
           if (id.includes("react-dom") || id.includes("/react/") || id.includes("scheduler")) return "react";
           return "ui";
