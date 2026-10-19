@@ -43,6 +43,10 @@ function lockLines(sheet) {
   return () => locked.forEach(([e, v]) => { e.style.whiteSpace = v; });
 }
 
+// Safari (آيباد وآيفون) أحياناً يرسم الصفحة قبل أن يجهز الخط داخل الصورة، فتتغير أماكن الكلمات.
+// الحل المعروف: نرسم مرة "تسخين" ونعتمد الرسمة الثانية
+const SAFARI = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
+
 let fontCSS = null; // الخطوط المضمّنة تُجهَّز مرة واحدة فقط
 
 // نضمّن خطوط الموقع (العربية واللاتينية فقط) داخل الصورة حتى تظهر كما في الشاشة
@@ -83,7 +87,11 @@ export async function sheetsToPdf(sheets, fileName, onProgress) {
       await new Promise((r) => setTimeout(r, 0)); // نترك المتصفح يحدّث العدّاد
       const el = sheets[i]; const cuts = cutPoints(el); const unlock = lockLines(el);
       let canvas;
-      try { canvas = await toCanvas(el, { pixelRatio: SCALE, backgroundColor: "#ffffff", fontEmbedCSS, skipFonts: !fontEmbedCSS, cacheBust: false }); }
+      const opts = { pixelRatio: SCALE, backgroundColor: "#ffffff", fontEmbedCSS, skipFonts: !fontEmbedCSS, cacheBust: false };
+      try {
+        if (i === 0 || SAFARI) { await toCanvas(el, { ...opts, pixelRatio: 1 }); await new Promise((r) => setTimeout(r, SAFARI ? 150 : 0)); } // تسخين
+        canvas = await toCanvas(el, opts);
+      }
       finally { unlock(); }
       const k = canvas.width / el.offsetWidth;
       // صفحة أطول قليلاً من A4: نصغّرها لتدخل في صفحة واحدة بدل قطعة صغيرة في صفحة جديدة
