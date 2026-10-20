@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { db, put, settings, displayName, logout, mode } from "../lib/store.js";
 import { go, bulk } from "../lib/router.js";
-import { n, pct, secs, opName, fmtDate, toast } from "../lib/util.js";
+import { n, pct, secs, opName, fmtDate, toast, testScope } from "../lib/util.js";
 import { studentAgg, classStudents } from "../lib/stats.js";
 import {
   Shell, Avatar, Stars, Icon, Empty, Kpi, OpTag, PageHead, Panel, List, Row, RowMain, RowActions, Score, Btn, useBusy, nextFrame, Hint,
@@ -40,7 +40,7 @@ export function Student({ r }) {
         <h2>الاختبارات</h2>
         <List>{a.h.slice().reverse().map((e) => (
           <Row key={e.t.id}><OpTag op={e.t.op} />
-            <RowMain title={`اختبار ${opName(e.t.op)} · ${fmtDate(e.t.date)}`} sub={`الجداول: ${e.t.tables.map(n).join("، ")}`} />
+            <RowMain title={`اختبار ${opName(e.t.op)} · ${fmtDate(e.t.date)}`} sub={testScope(e.t)} />
             <RowActions>{e.r.status === "absent" ? <Badge variant="outline">غائب</Badge> : <>
               <Score p={e.x.p}>{n(e.x.c)}/{n(e.x.total)}</Score>
               <Button variant="outline" size="sm" onClick={() => go("result", e.t.id, null, s.id)}>الأخطاء</Button></>}</RowActions>

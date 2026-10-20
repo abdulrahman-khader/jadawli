@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { db, put, del } from "../lib/store.js";
 import { go } from "../lib/router.js";
-import { n, pct, secs, uid, toast, opSym, opName, fmtDate, scoreColor, downloadCSV } from "../lib/util.js";
+import { n, pct, secs, uid, toast, opSym, opName, fmtDate, scoreColor, downloadCSV, testScope } from "../lib/util.js";
 import { classStudents, classTests, testStats, studentAgg, classAgg, reportIds, periodText, sc } from "../lib/stats.js";
 import {
   Shell, Avatar, Stars, Icon, Empty, Kpi, OpTag, ConfirmButton, PageHead, Panel, List, Row, RowMain, RowActions, Btn, useBusy, nextFrame, Hint,
@@ -93,7 +93,7 @@ function Tests({ tests }) {
     return (
       <Row key={t.id}><OpTag op={t.op} />
         <RowMain title={`اختبار ${opName(t.op)} · ${fmtDate(t.date)}`} onClick={() => go("test", t.id)}
-          sub={<><span>الجداول: {t.tables.map(n).join("، ")}</span> · <span>{n(t.count)} سؤال</span>{t.strict && <> · <span>استبعاد نهائي</span></>}</>} />
+          sub={<><span>{testScope(t)}</span> · <span>{n(t.count)} سؤال</span>{t.strict && <> · <span>استبعاد نهائي</span></>}</>} />
         <RowActions>{st.avg != null && <Badge className="bg-secondary text-primary">{pct(st.avg)}</Badge>}<Badge variant="outline">{n(st.done.length)}/{n(st.studs.length)}</Badge>
           {st.pending > 0 && <Badge className="bg-warm/30 text-foreground">باقي {n(st.pending)}</Badge>}</RowActions>
       </Row>
@@ -154,7 +154,7 @@ function Report({ c, studs, tests }) {
               return (
                 <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5" key={t.id}>
                   <Checkbox checked={ids.includes(t.id)} onCheckedChange={(v) => toggle(t.id, !!v)} className="size-5" />
-                  <OpTag op={t.op} /><RowMain title={`اختبار ${opName(t.op)} · ${fmtDate(t.date)}`} sub={`الجداول ${t.tables.map(n).join("، ")}`} />
+                  <OpTag op={t.op} /><RowMain title={`اختبار ${opName(t.op)} · ${fmtDate(t.date)}`} sub={testScope(t)} />
                   {st.avg != null && <Badge className="bg-secondary text-primary">{pct(st.avg)}</Badge>}
                 </label>
               );

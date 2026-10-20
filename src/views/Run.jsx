@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { db, put } from "../lib/store.js";
 import { go } from "../lib/router.js";
-import { n, pct, secs, opName, toast, isAr } from "../lib/util.js";
+import { n, pct, secs, opName, toast, isAr, testScope } from "../lib/util.js";
 import { classStudents, makeQuestions, sc, qText, qAns } from "../lib/stats.js";
 import { Shell, Avatar, Icon, Empty, ConfirmButton } from "../components/app.jsx";
 import { Button } from "../components/ui/button.jsx";
@@ -73,7 +73,7 @@ export default function Run({ r }) {
     if (!t || !s || !run) return { phase: "idle" };
     const q = run.phase === "q" ? run.qs[run.i] : null; const x = run.phase === "done" ? sc(t.results[s.id]) : null;
     return {
-      phase: run.phase, name: s.name, info: `اختبار ${opName(t.op)} · الجداول ${t.tables.map(n).join("، ")}`, i: run.i, total: run.qs.length,
+      phase: run.phase, name: s.name, info: `اختبار ${opName(t.op)} · ${testScope(t)}`, i: run.i, total: run.qs.length,
       q: q ? qText(q) : null, ans: q ? n(qAns(q)) : null, div: q?.op === "div", reveal: !!run.reveal, ok: q?.ok ?? null, to: !!q?.to,
       // remain: الوقت الباقي لحظة بدء السؤال أو استئنافه، والجوال يعدّ بساعته هو (ساعتا الجهازين قد تختلفان)
       paused: !!run.paused, remain: q && !run.paused && !run.reveal ? Math.round(run.remain) : null, seg: run.seg || 0,
@@ -92,7 +92,7 @@ export default function Run({ r }) {
   if (run.phase === "ready") return (
     <Shell title="الاختبار" back={back}><div className="run">
       <Avatar name={s.name} className="size-16 rounded-2xl text-2xl" /><h1 className="text-4xl">{s.name}</h1>
-      <p className="text-muted-foreground">اختبار {opName(t.op)} · الجداول {t.tables.map(n).join("، ")}</p>
+      <p className="text-muted-foreground">اختبار {opName(t.op)} · {testScope(t)}</p>
       <p>{n(run.qs.length)} سؤالاً · {n(t.seconds)} ثوانٍ لكل سؤال. إذا انتهى الوقت يُحسب السؤال خطأ.</p>
       <Button variant="warm" size="xl" className="h-16 text-xl" disabled={!run.qs.length}
         onClick={() => { run.phase = "q"; begin(); }}><Icon name="play" /> ابدأ الآن</Button>

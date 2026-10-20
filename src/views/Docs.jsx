@@ -1,7 +1,7 @@
 import { useReducer, useState } from "react";
 import { db, settings, displayName } from "../lib/store.js";
 import { go, bulk } from "../lib/router.js";
-import { n, pct, secs, opName, fmtDate, shuffle, scoreColor, T10, toast } from "../lib/util.js";
+import { n, pct, secs, opName, fmtDate, shuffle, scoreColor, T10, toast, testScope, isTables } from "../lib/util.js";
 import { testStats, sc, qText, classStudents, classAgg, reportIds, periodText, studentAgg } from "../lib/stats.js";
 import { planData, TRICKS, explainFact, splitFact, targetFacts } from "../lib/plan.js";
 import { Icon, Kpi, Logo, Btn, useBusy, nextFrame, Spinner } from "../components/app.jsx";
@@ -38,10 +38,10 @@ function TestDoc({ t }) {
   return <>
     <section className="sheet"><DocHead />
       <h1 className="dtitle">تقرير اختبار {opName(t.op)} · {c?.name}</h1>
-      <p className="dsub">{fmtDate(t.date)} · الجداول {t.tables.map(n).join("، ")} · {n(t.count)} سؤال · {n(t.seconds)} ثوانٍ للسؤال{t.strict ? " · استبعاد نهائي" : ""}</p>
+      <p className="dsub">{fmtDate(t.date)} · {testScope(t)} · {n(t.count)} سؤال · {n(t.seconds)} ثوانٍ للسؤال{t.strict ? " · استبعاد نهائي" : ""}</p>
       <div className="kpis"><Kpi v={pct(st.avg)} label="المتوسط" /><Kpi v={pct(st.max)} label="الأعلى" /><Kpi v={pct(st.min)} label="الأقل" /><Kpi v={`${n(st.done.length)}/${n(st.studs.length)}`} label={`أنهوا · ${n(st.absent)} غائب`} /></div>
       <Sec title="درجات الطلاب"><HBars items={ranked.map((d) => ({ label: d.s.name, p: d.x.p }))} /></Sec>
-      <Sec title="الدقة في كل جدول"><ColChart tables={st.tables} /></Sec>
+      {isTables(t.op) && <Sec title="الدقة في كل جدول"><ColChart tables={st.tables} /></Sec>}
       <Sec title="أكثر الأسئلة خطأً"><Facts list={st.facts} op={t.op} /></Sec>
     </section>
     <section className="sheet"><Sec title="التفاصيل"><table className="dtable"><thead><tr><th>#</th><th>الطالب</th><th>الدرجة</th><th>النسبة</th><th>الزمن</th><th>الأسئلة الخاطئة</th></tr></thead><tbody>
@@ -82,7 +82,7 @@ function StudentDoc({ sid }) {
       <Sec title="خريطة الإتقان"><HeatMap a={a} /></Sec>
     </section>
     <section className="sheet"><Sec title="سجل الاختبارات"><table className="dtable"><thead><tr><th>التاريخ</th><th>النوع</th><th>الجداول</th><th>الدرجة</th><th>الأسئلة الخاطئة</th></tr></thead><tbody>
-      {a.h.map((e) => <tr key={e.t.id}><td>{fmtDate(e.t.date, true)}</td><td>{opName(e.t.op)}</td><td>{e.t.tables.map(n).join("، ")}</td>
+      {a.h.map((e) => <tr key={e.t.id}><td>{fmtDate(e.t.date, true)}</td><td>{opName(e.t.op)}</td><td>{testScope(e.t, true)}</td>
         <td>{e.r.status === "absent" ? "غائب" : `${n(e.x.c)}/${n(e.x.total)} (${pct(e.x.p)})`}</td>
         <td className="r" dir="rtl">{e.x ? e.r.items.filter((q) => !q.ok).map(qText).join("، ") || "—" : "—"}</td></tr>)}
     </tbody></table></Sec></section>

@@ -3,7 +3,7 @@ import { db, put, del } from "../lib/store.js";
 import { useRemoteHost } from "../lib/remote.js";
 import { RemoteButton, RemoteQr, studentList } from "../components/remote-qr.jsx";
 import { go } from "../lib/router.js";
-import { n, pct, secs, toast, opName, fmtDate, downloadCSV, isAr } from "../lib/util.js";
+import { n, pct, secs, toast, opName, fmtDate, downloadCSV, isAr, testScope, isTables } from "../lib/util.js";
 import { testStats, sc, qText, qAns, qPlain } from "../lib/stats.js";
 import {
   Shell, Avatar, Icon, Empty, Kpi, OpTag, ConfirmButton, PageHead, Panel, List, Row, RowMain, RowActions, Score, Btn, useBusy, nextFrame, Hint,
@@ -40,7 +40,7 @@ export default function TestView({ r }) {
   return (
     <Shell title={`اختبار ${opName(t.op)}`} back={["class", t.classId, "tests"]}>
       <PageHead icon={<OpTag op={t.op} />} title={`اختبار ${opName(t.op)} · ${c?.name || ""}`} sub={fmtDate(t.date)} />
-      <div className="flex flex-wrap gap-1.5"><Badge className={t.op === "div" ? "bg-div-soft text-div" : "bg-secondary text-primary"}>الجداول: {t.tables.map(n).join("، ")}</Badge>
+      <div className="flex flex-wrap gap-1.5"><Badge className={t.op === "div" ? "bg-div-soft text-div" : isTables(t.op) ? "bg-secondary text-primary" : "bg-warm/30 text-foreground"}>{testScope(t)}</Badge>
         <Badge variant="outline">{n(t.count)} سؤال</Badge><Badge variant="outline">{n(t.seconds)} ثوانٍ للسؤال</Badge>{t.strict && <Badge className="bg-warm/30 text-foreground">استبعاد نهائي</Badge>}</div>
       {next && <Button variant="warm" size="xl" onClick={() => go("run", t.id, null, next.id)}><Icon name="play" /> ابدأ مع {next.name}</Button>}
       <RemoteButton className="self-start" onClick={() => setQrOpen(true)} /><RemoteQr open={qrOpen} onClose={() => setQrOpen(false)} />
@@ -67,7 +67,7 @@ export default function TestView({ r }) {
       })}</List> : <Empty title="لا يوجد طلاب في هذا الفصل" />}
       {st.done.length > 0 && <>
         <Panel title="أكثر الأسئلة خطأً"><Facts list={st.facts} op={t.op} lim={10} /></Panel>
-        <Panel title="الدقة في كل جدول"><ColChart tables={st.tables} /></Panel>
+        {isTables(t.op) && <Panel title="الدقة في كل جدول"><ColChart tables={st.tables} /></Panel>}
       </>}
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => go("doc", t.id, "test")}><Icon name="pdf" /> تقرير PDF</Button>

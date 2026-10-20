@@ -7,6 +7,7 @@ import {
 import { go } from "../lib/router.js";
 import { mode } from "../lib/store.js";
 import { cn } from "../lib/utils.js";
+import { opSym } from "../lib/util.js";
 import { Button } from "./ui/button.jsx";
 import { Card } from "./ui/card.jsx";
 import { Badge } from "./ui/badge.jsx";
@@ -64,7 +65,7 @@ export function Stars({ p }) {
   return <span className="tracking-wider text-warm" aria-label={`${k} نجوم`}>{"★".repeat(k)}<span className="text-border">{"★".repeat(3 - k)}</span></span>;
 }
 export function OpTag({ op }) {
-  return <span className={cn("grid size-10 flex-none place-items-center rounded-xl font-display text-2xl font-bold", op === "div" ? "bg-div-soft text-div" : "bg-secondary text-primary")}>{op === "div" ? "÷" : "×"}</span>;
+  return <span className={cn("grid size-10 flex-none place-items-center rounded-xl font-display text-2xl font-bold", op === "div" ? "bg-div-soft text-div" : op === "add" || op === "sub" ? "bg-warm/25 text-warm-foreground dark:text-warm" : "bg-secondary text-primary")}>{opSym(op)}</span>;
 }
 // شارة درجة ملوّنة حسب المستوى
 export function Score({ p, children, className }) {

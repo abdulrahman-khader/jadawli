@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { db, put, settings } from "../lib/store.js";
 import { go } from "../lib/router.js";
-import { n, uid, toast, T10 } from "../lib/util.js";
+import { n, uid, toast, T10, isTables, LEVELS } from "../lib/util.js";
 import { classTests, buildPool } from "../lib/stats.js";
 import { cn } from "../lib/utils.js";
 import { Shell, Icon, Empty, Panel, Btn } from "../components/app.jsx";
@@ -39,26 +39,41 @@ export default function NewTest({ r }) {
   const [count, setCount] = useState(st.count);
   const [seconds, setSeconds] = useState(st.seconds);
   const [swap, setSwap] = useState(st.swap);
+  const [level, setLevel] = useState(last?.level || 1);
   if (!c) return <Shell title="اختبار جديد" back={["home"]}><Empty title="هذا الفصل غير موجود" /></Shell>;
 
   const pool = buildPool(tables, strict); const ex = T10.filter((t) => !tables.includes(t));
   function create(e) {
     e.preventDefault();
-    if (!tables.length) { toast("اختر جدولاً واحداً على الأقل"); return; }
-    const t = { id: uid(), classId: c.id, op, tables: tables.slice().sort((a, b) => a - b), maxM: 10, strict, count: clamp(count, 1, 100), seconds: clamp(seconds, 3, 60), swap, date: Date.now(), results: {} };
+    const tb = isTables(op);
+    if (tb && !tables.length) { toast("اختر جدولاً واحداً على الأقل"); return; }
+    const t = { id: uid(), classId: c.id, op, tables: tb ? tables.slice().sort((a, b) => a - b) : [], maxM: 10, strict: tb && strict, count: clamp(count, 1, 100), seconds: clamp(seconds, 3, 60), swap: tb && swap, date: Date.now(), results: {} };
+    if (!tb) t.level = level;
     put("tests", t); toast("أُنشئ الاختبار"); go("test", t.id);
   }
-  const opItem = "h-14 flex-1 rounded-xl border-2 text-base data-[state=on]:text-white";
+  const opItem = "h-14 rounded-xl border-2 text-base data-[state=on]:text-white";
+  const tb = isTables(op);
   return (
     <Shell title="اختبار جديد" back={["class", c.id, "tests"]}>
       <h1>اختبار جديد · {c.name}</h1>
       <form className="flex flex-col gap-4" onSubmit={create}>
         <Panel title="نوع الاختبار">
-          <ToggleGroup type="single" value={op} onValueChange={(v) => v && setOp(v)} className="w-full gap-2" dir="rtl">
+          <ToggleGroup type="single" value={op} onValueChange={(v) => v && setOp(v)} className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4" dir="rtl">
             <ToggleGroupItem value="mul" className={cn(opItem, "data-[state=on]:border-primary data-[state=on]:bg-primary")}><b className="font-display text-2xl">×</b> ضرب</ToggleGroupItem>
             <ToggleGroupItem value="div" className={cn(opItem, "data-[state=on]:border-div data-[state=on]:bg-div")}><b className="font-display text-2xl">÷</b> قسمة</ToggleGroupItem>
+            <ToggleGroupItem value="add" className={cn(opItem, "data-[state=on]:border-warm data-[state=on]:bg-warm data-[state=on]:text-warm-foreground")}><b className="font-display text-2xl">+</b> جمع</ToggleGroupItem>
+            <ToggleGroupItem value="sub" className={cn(opItem, "data-[state=on]:border-warm data-[state=on]:bg-warm data-[state=on]:text-warm-foreground")}><b className="font-display text-2xl">−</b> طرح</ToggleGroupItem>
           </ToggleGroup>
         </Panel>
+        {!tb && <Panel title="نوع الأعداد">
+          <ToggleGroup type="single" value={String(level)} onValueChange={(v) => v && setLevel(+v)} className="grid w-full grid-cols-2 gap-2" dir="rtl">
+            {[1, 2].map((k) => <ToggleGroupItem key={k} value={String(k)} className="flex h-auto flex-col gap-0.5 rounded-xl border-2 py-3 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+              <b className="text-base">{LEVELS[k]}</b><span className="font-display text-lg opacity-80" dir="rtl">{k === 1 ? (op === "add" ? `${n(7)} + ${n(5)}` : `${n(9)} − ${n(4)}`) : (op === "add" ? `${n(47)} + ${n(25)}` : `${n(83)} − ${n(36)}`)}</span>
+            </ToggleGroupItem>)}
+          </ToggleGroup>
+          <p className="text-sm text-muted-foreground">{level === 1 ? `أعداد من ${n(1)} إلى ${n(9)}.` : `أعداد من ${n(10)} إلى ${n(99)}.`}{op === "sub" ? " في الطرح يكون العدد الأول أكبر دائماً، فلا يطلع ناتج سالب." : ""}</p>
+        </Panel>}
+        {tb && <>
         <Panel title="الجداول" action={<div className="flex flex-wrap gap-1.5">
           <Button type="button" variant="outline" size="sm" onClick={() => setTables(T10.slice())}>الكل</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => setTables([])}>لا شيء</Button>
@@ -73,10 +88,11 @@ export default function NewTest({ r }) {
           <div className="rounded-xl bg-secondary px-3.5 py-3 font-bold text-primary">{!tables.length ? <span className="text-destructive">اختر جدولاً واحداً على الأقل.</span> :
             <span>الأسئلة المختلفة المتاحة: {n(pool.length)}{strict && ex.length ? ` · لن يظهر أي سؤال فيه: ${ex.map(n).join("، ")}` : ""}{count > pool.length ? " · سيتكرر بعضها" : ""}</span>}</div>
         </Panel>
+        </>}
         <Panel title="الإعدادات">
           <div className="flex flex-wrap items-center justify-between gap-2"><label htmlFor="cnt">عدد الأسئلة لكل طالب</label><Stepper id="cnt" value={count} set={setCount} lo={1} hi={100} /></div>
           <div className="flex flex-wrap items-center justify-between gap-2"><label htmlFor="sec">زمن السؤال (ثانية)</label><Stepper id="sec" value={seconds} set={setSeconds} lo={3} hi={60} /></div>
-          <SwitchRow checked={swap} onChange={setSwap} title="خلط ترتيب العددين في الضرب" desc="مثل ٤ × ٣ بدل ٣ × ٤" />
+          {op === "mul" && <SwitchRow checked={swap} onChange={setSwap} title="خلط ترتيب العددين في الضرب" desc="مثل ٤ × ٣ بدل ٣ × ٤" />}
         </Panel>
         <Btn size="xl"><Icon name="play" /> إنشاء الاختبار</Btn>
       </form>

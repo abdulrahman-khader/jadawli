@@ -18,8 +18,12 @@ export function fmtDate(ts, short) {
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 export const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 export const T10 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-export const opSym = (op) => (op === "div" ? "÷" : "×");
-export const opName = (op) => (op === "div" ? "القسمة" : "الضرب");
+export const opSym = (op) => ({ div: "÷", add: "+", sub: "−" })[op] || "×";
+export const opName = (op) => ({ div: "القسمة", add: "الجمع", sub: "الطرح" })[op] || "الضرب";
+// الضرب والقسمة مبنيان على الجداول؛ الجمع والطرح على مستوى (عدد مع عدد / عددين مع عددين)
+export const isTables = (op) => op !== "add" && op !== "sub";
+export const LEVELS = { 1: "عدد مع عدد", 2: "عددين مع عددين" };
+export const testScope = (t, short) => (isTables(t.op) ? (short ? "" : "الجداول ") + (t.tables || []).map(n).join("، ") : LEVELS[t.level] || LEVELS[1]);
 export const levelColor = (p) => (p == null ? "var(--line)" : p >= 90 ? "var(--good)" : p >= 70 ? "var(--pencil)" : "var(--bad)");
 export const chipCls = (p) => (p >= 90 ? "good" : p >= 70 ? "warn" : "bad");
 export const scoreColor = (p) => (p >= 90 ? "var(--good)" : p >= 70 ? "var(--ink)" : "var(--bad)");
