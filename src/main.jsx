@@ -13,4 +13,9 @@ import "@fontsource/baloo-bhaijaan-2/800.css";
 import "./index.css";
 import "./styles.css";
 
+// عند فتح الموقع من جديد (بعد إغلاقه) نبدأ من الصفحة الرئيسية. التحديث العادي يبقى في نفس الصفحة،
+// ورابط الجوال (#/remote/…) يبقى كما هو
+const nav = performance.getEntriesByType?.("navigation")?.[0];
+if (nav?.type !== "reload" && location.hash && !location.hash.startsWith("#/remote/")) history.replaceState(null, "", location.pathname + location.search);
+
 createRoot(document.getElementById("root")).render(<StrictMode><App /></StrictMode>);
