@@ -40,8 +40,9 @@ export function studentHistory(sid, ids) {
   return Object.values(db.data.tests).filter((t) => t.classId === s.classId && t.results?.[sid] && (!ids || ids.includes(t.id)))
     .sort((a, b) => a.date - b.date).map((t) => ({ t, r: t.results[sid], x: sc(t.results[sid]) }));
 }
-export function studentAgg(sid, ids) {
-  const h = studentHistory(sid, ids); const done = h.filter((e) => e.x); const absent = h.filter((e) => e.r.status === "absent").length;
+// fam: "x" للضرب والقسمة فقط، "pm" للجمع والطرح فقط، وبدونه كل الاختبارات
+export function studentAgg(sid, ids, fam) {
+  const h = studentHistory(sid, ids).filter((e) => !fam || (fam === "x") === isTables(e.t.op)); const done = h.filter((e) => e.x); const absent = h.filter((e) => e.r.status === "absent").length;
   const facts = {}, tables = {}; let ms = 0, msn = 0;
   for (const e of done) for (const q of e.r.items) {
     if (!q.to) { ms += q.ms; msn++; }

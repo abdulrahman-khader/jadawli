@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { db, put, del } from "../lib/store.js";
 import { useRemoteHost } from "../lib/remote.js";
+import { famOf } from "../lib/arith.js";
 import { RemoteButton, RemoteQr, studentList } from "../components/remote-qr.jsx";
 import { go } from "../lib/router.js";
 import { n, pct, secs, toast, opName, fmtDate, downloadCSV, isAr, testScope, isTables } from "../lib/util.js";
@@ -71,6 +72,7 @@ export default function TestView({ r }) {
       </>}
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => go("doc", t.id, "test")}><Icon name="pdf" /> تقرير PDF</Button>
+        {st.done.length > 0 && <Button variant="warm" onClick={() => go("bulk", t.classId, null, famOf(t.op))}><Icon name="sheet" /> أوراق العمل</Button>}
         <Btn variant="outline" loading={busyX} onClick={csv}><Icon name="xls" /> Excel</Btn>
         <ConfirmButton size="default" className="text-destructive" confirmText="حذف هذا الاختبار؟" desc="ستُحذف نتائج كل الطلاب في هذا الاختبار نهائياً." action="حذف الاختبار"
           onConfirm={() => { del("tests", t.id); toast("حُذف الاختبار"); go("class", t.classId, "tests"); }}><Icon name="trash" /> حذف الاختبار</ConfirmButton>

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { db, put, settings, displayName, logout, mode } from "../lib/store.js";
 import { go, bulk } from "../lib/router.js";
 import { n, pct, secs, opName, fmtDate, toast, testScope } from "../lib/util.js";
-import { studentAgg, classStudents } from "../lib/stats.js";
+import { studentAgg, classStudents, classTests } from "../lib/stats.js";
+import { famOf, famHasDone, FAM_NAME } from "../lib/arith.js";
+import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group.jsx";
 import {
   Shell, Avatar, Stars, Icon, Empty, Kpi, OpTag, PageHead, Panel, List, Row, RowMain, RowActions, Score, Btn, useBusy, nextFrame, Hint,
 } from "../components/app.jsx";
@@ -28,8 +30,10 @@ export function Student({ r }) {
         <Label htmlFor="renameIn">اسم الطالب</Label>
         <div className="flex flex-wrap gap-2"><Input id="renameIn" name="name" className="h-10 flex-[1_1_180px]" defaultValue={s.name} required maxLength={50} autoFocus /><Button size="lg">حفظ</Button></div></form></Panel>}
       {has && <div className="flex flex-wrap gap-2">
-        <Button onClick={() => go("doc", s.id, "plan")}><Icon name="pdf" /> الخطة العلاجية</Button>
-        <Button variant="warm" onClick={() => go("doc", s.id, "sheet")}><Icon name="sheet" /> ورقة العمل</Button>
+        {["x", "pm"].filter((f) => famHasDone(s.id, f)).map((f, i, arr) => { const tag = arr.length > 1 ? ` · ${FAM_NAME[f]}` : "";
+          return <span className="contents" key={f}>
+            <Button onClick={() => go("doc", s.id, "plan", f)}><Icon name="pdf" /> الخطة العلاجية{tag}</Button>
+            <Button variant="warm" onClick={() => go("doc", s.id, "sheet", f)}><Icon name="sheet" /> ورقة العمل{tag}</Button></span>; })}
         <Button variant="outline" onClick={() => go("doc", s.id, "student")}><Icon name="pdf" /> تقرير الطالب</Button>
       </div>}
       {a.h.length ? <>
@@ -53,7 +57,10 @@ export function Student({ r }) {
 
 export function Bulk({ r }) {
   const c = db.data.classes[r.id];
-  const rows = c ? classStudents(c.id).map((s) => ({ s, a: studentAgg(s.id) })) : [];
+  // نوع الأوراق حسب الاختبار: الضرب والقسمة أو الجمع والطرح
+  const fams = c ? [...new Set(classTests(c.id).filter((t) => Object.values(t.results || {}).some((x) => x.status === "done")).map((t) => famOf(t.op)))] : [];
+  const fam = fams.includes(r.id2) ? r.id2 : fams[0] || "x";
+  const rows = c ? classStudents(c.id).map((s) => ({ s, a: studentAgg(s.id, null, fam) })) : [];
   const [sel, setSel] = useState(() => new Set(rows.filter((x) => x.a.done.length).map((x) => x.s.id)));
   const [busy, run] = useBusy();
   if (!c) return <Shell title="أوراق العمل" back={["home"]}><Empty title="هذا الفصل غير موجود" /></Shell>;
@@ -62,6 +69,9 @@ export function Bulk({ r }) {
   return (
     <Shell title="أوراق عمل الفصل" back={["class", c.id]}>
       <h1>أوراق عمل · {c.name}</h1>
+      {fams.length > 1 && <ToggleGroup type="single" value={fam} onValueChange={(v) => v && go("bulk", c.id, null, v, { replace: true })} className="grid w-full grid-cols-2 gap-2" dir="rtl">
+        {["x", "pm"].map((f) => <ToggleGroupItem key={f} value={f} className="h-12 rounded-xl border-2 text-base data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">{FAM_NAME[f]}</ToggleGroupItem>)}
+      </ToggleGroup>}
       <p className="text-muted-foreground">كل طالب يحصل على ورقة عمل خاصة بأخطائه. أزل العلامة عن الطالب الذي لا تريد له ورقة.</p>
       <div className="flex flex-wrap items-center gap-2"><Button variant="outline" size="sm" onClick={() => setSel(new Set(all))}>تحديد الكل</Button>
         <Button variant="outline" size="sm" onClick={() => setSel(new Set())}>إلغاء الكل</Button><Hint>المحدد: {n(sel.size)} طالب</Hint></div>
@@ -77,7 +87,7 @@ export function Bulk({ r }) {
       })}</List>
       <Btn size="xl" loading={busy} onClick={() => run(async () => {
         if (!sel.size) { toast("اختر طالباً واحداً على الأقل"); return; }
-        await nextFrame(); bulk.ids = rows.map((x) => x.s.id).filter((id) => sel.has(id)); go("doc", c.id, "sheets");
+        await nextFrame(); bulk.ids = rows.map((x) => x.s.id).filter((id) => sel.has(id)); go("doc", c.id, "sheets", fam);
       })}><Icon name="sheet" /> {busy ? "نجهّز الأوراق…" : "إنشاء أوراق العمل"}</Btn>
     </Shell>
   );

@@ -37,7 +37,7 @@ export function explainFact(t, m) {
 }
 
 export function planData(sid) {
-  const s = db.data.students[sid]; const a = studentAgg(sid); if (!s || !a.done.length) return null;
+  const s = db.data.students[sid]; const a = studentAgg(sid, null, "x"); if (!s || !a.done.length) return null;
   const tbl = Object.values(a.tables).map((v) => ({ ...v, p: (v.c * 100) / v.tries, avgMs: v.msn ? v.ms / v.msn : null }));
   const weak = tbl.filter((v) => v.p < 80).sort((x, y) => x.p - y.p);
   const slow = tbl.filter((v) => v.p >= 80 && v.avgMs != null && v.avgMs > 5000).sort((x, y) => y.avgMs - x.avgMs);
@@ -49,7 +49,7 @@ export function planData(sid) {
   if (!focus.length) focus = tbl.slice().sort((x, y) => x.p - y.p || (y.avgMs ?? 0) - (x.avgMs ?? 0)).map((v) => v.t).slice(0, 2);
   const p = a.avg;
   const lv = p >= 90 ? { t: "متقن", c: "var(--good)" } : p >= 75 ? { t: "جيد", c: "var(--primary)" } : p >= 50 ? { t: "يحتاج دعماً", c: "#B7791F" } : { t: "يحتاج دعماً مكثفاً", c: "var(--bad)" };
-  return { s, c: db.data.classes[s.classId], a, tbl, weak, slow, strong, wrongFacts, hadDiv, focus, lv };
+  return { fam: "x", s, c: db.data.classes[s.classId], a, tbl, weak, slow, strong, wrongFacts, hadDiv, focus, lv };
 }
 
 // تفكيك الحقيقة إلى جزأين معروفين لرسم النقاط
