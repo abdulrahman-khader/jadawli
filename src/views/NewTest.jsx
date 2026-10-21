@@ -4,6 +4,7 @@ import { go } from "../lib/router.js";
 import { n, uid, toast, T10, isTables, LEVELS } from "../lib/util.js";
 import { classTests, buildPool } from "../lib/stats.js";
 import { cn } from "../lib/utils.js";
+import { getFam, FAM_NAME } from "../lib/section.js";
 import { Shell, Icon, Empty, Panel, Btn } from "../components/app.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { Input } from "../components/ui/input.jsx";
@@ -32,8 +33,8 @@ export function SwitchRow({ checked, defaultChecked, onChange, title, desc, name
 
 export default function NewTest({ r }) {
   const c = db.data.classes[r.id];
-  const st = settings(); const last = c ? classTests(c.id)[0] : null;
-  const [op, setOp] = useState(last?.op || "mul");
+  const fam = getFam(); const st = settings(); const last = c ? classTests(c.id, fam)[0] : null;
+  const [op, setOp] = useState(last?.op || (fam === "pm" ? "add" : "mul"));
   const [tables, setTables] = useState((last ? last.tables : [2, 3, 4, 5]).filter((t) => t <= 10));
   const [strict, setStrict] = useState(st.strict);
   const [count, setCount] = useState(st.count);
@@ -55,14 +56,17 @@ export default function NewTest({ r }) {
   const tb = isTables(op);
   return (
     <Shell title="اختبار جديد" back={["class", c.id, "tests"]}>
-      <h1>اختبار جديد · {c.name}</h1>
+      <h1>اختبار {FAM_NAME[fam]} جديد · {c.name}</h1>
       <form className="flex flex-col gap-4" onSubmit={create}>
         <Panel title="نوع الاختبار">
-          <ToggleGroup type="single" value={op} onValueChange={(v) => v && setOp(v)} className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4" dir="rtl">
+          <ToggleGroup type="single" value={op} onValueChange={(v) => v && setOp(v)} className="grid w-full grid-cols-2 gap-2" dir="rtl">
+            {fam === "x" ? <>
             <ToggleGroupItem value="mul" className={cn(opItem, "data-[state=on]:border-primary data-[state=on]:bg-primary")}><b className="font-display text-2xl">×</b> ضرب</ToggleGroupItem>
             <ToggleGroupItem value="div" className={cn(opItem, "data-[state=on]:border-div data-[state=on]:bg-div")}><b className="font-display text-2xl">÷</b> قسمة</ToggleGroupItem>
+            </> : <>
             <ToggleGroupItem value="add" className={cn(opItem, "data-[state=on]:border-warm data-[state=on]:bg-warm data-[state=on]:text-warm-foreground")}><b className="font-display text-2xl">+</b> جمع</ToggleGroupItem>
             <ToggleGroupItem value="sub" className={cn(opItem, "data-[state=on]:border-warm data-[state=on]:bg-warm data-[state=on]:text-warm-foreground")}><b className="font-display text-2xl">−</b> طرح</ToggleGroupItem>
+            </>}
           </ToggleGroup>
         </Panel>
         {!tb && <Panel title="نوع الأعداد">

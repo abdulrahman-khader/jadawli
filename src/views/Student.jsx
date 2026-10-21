@@ -2,13 +2,14 @@ import { useState } from "react";
 import { db, put, settings, displayName, logout, mode } from "../lib/store.js";
 import { go, bulk } from "../lib/router.js";
 import { n, pct, secs, opName, fmtDate, toast, testScope } from "../lib/util.js";
-import { studentAgg, classStudents, classTests } from "../lib/stats.js";
-import { famOf, famHasDone, FAM_NAME } from "../lib/arith.js";
-import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group.jsx";
+import { studentAgg, classStudents } from "../lib/stats.js";
+import { arithPlanData } from "../lib/arith.js";
+import { getFam, FAM_NAME } from "../lib/section.js";
+import { SectionSwitch } from "../components/section.jsx";
 import {
   Shell, Avatar, Stars, Icon, Empty, Kpi, OpTag, PageHead, Panel, List, Row, RowMain, RowActions, Score, Btn, useBusy, nextFrame, Hint,
 } from "../components/app.jsx";
-import { LineChart, ColChart, HeatMap } from "../components/charts.jsx";
+import { LineChart, ColChart, HeatMap, HBars } from "../components/charts.jsx";
 import { SwitchRow } from "./NewTest.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { Input } from "../components/ui/input.jsx";
@@ -21,7 +22,9 @@ export function Student({ r }) {
   const s = db.data.students[r.id];
   const [rename, setRename] = useState(false);
   if (!s) return <Shell title="الطالب" back={["home"]}><Empty title="هذا الطالب غير موجود" /></Shell>;
-  const c = db.data.classes[s.classId]; const a = studentAgg(s.id); const has = a.done.length > 0;
+  // القسم الحالي: الدرجات والرسوم والخطة والتقرير لاختبارات هذا القسم فقط
+  const fam = getFam(); const c = db.data.classes[s.classId]; const a = studentAgg(s.id, null, fam); const has = a.done.length > 0;
+  const skills = fam === "pm" && has ? arithPlanData(s.id)?.tbl || [] : [];
   return (
     <Shell title={s.name} back={["class", s.classId, "students"]}>
       <PageHead icon={<Avatar name={s.name} />} title={s.name} sub={<>{c?.name} {has && <>· <Stars p={a.avg} /></>}</>}>
@@ -29,18 +32,18 @@ export function Student({ r }) {
       {rename && <Panel><form className="grid gap-2" onSubmit={(e) => { e.preventDefault(); s.name = String(new FormData(e.currentTarget).get("name")).trim() || s.name; put("students", s); setRename(false); toast("حُفظ اسم الطالب"); }}>
         <Label htmlFor="renameIn">اسم الطالب</Label>
         <div className="flex flex-wrap gap-2"><Input id="renameIn" name="name" className="h-10 flex-[1_1_180px]" defaultValue={s.name} required maxLength={50} autoFocus /><Button size="lg">حفظ</Button></div></form></Panel>}
+      <SectionSwitch fam={fam} />
       {has && <div className="flex flex-wrap gap-2">
-        {["x", "pm"].filter((f) => famHasDone(s.id, f)).map((f, i, arr) => { const tag = arr.length > 1 ? ` · ${FAM_NAME[f]}` : "";
-          return <span className="contents" key={f}>
-            <Button onClick={() => go("doc", s.id, "plan", f)}><Icon name="pdf" /> الخطة العلاجية{tag}</Button>
-            <Button variant="warm" onClick={() => go("doc", s.id, "sheet", f)}><Icon name="sheet" /> ورقة العمل{tag}</Button></span>; })}
-        <Button variant="outline" onClick={() => go("doc", s.id, "student")}><Icon name="pdf" /> تقرير الطالب</Button>
+        <Button onClick={() => go("doc", s.id, "plan", fam)}><Icon name="pdf" /> الخطة العلاجية</Button>
+        <Button variant="warm" onClick={() => go("doc", s.id, "sheet", fam)}><Icon name="sheet" /> ورقة العمل</Button>
+        <Button variant="outline" onClick={() => go("doc", s.id, "student", fam)}><Icon name="pdf" /> تقرير الطالب</Button>
       </div>}
       {a.h.length ? <>
         <div className="kpis"><Kpi v={pct(a.avg)} label="متوسط الدرجات" /><Kpi v={secs(a.avgMs)} label="متوسط زمن الإجابة" /><Kpi v={n(a.done.length)} label="اختبار" /><Kpi v={n(a.absent)} label="غياب" /></div>
         <Panel title="تطور الدرجات"><LineChart points={a.done.map((e) => ({ label: fmtDate(e.t.date, true), p: e.x.p }))} /></Panel>
-        <Panel title="الدقة في كل جدول"><ColChart tables={a.tables} /></Panel>
-        <Panel title="خريطة الإتقان"><Hint>الصفوف: الجدول · الأعمدة: العدد المضروب فيه. القسمة تُحسب على حقيقة الضرب المقابلة.</Hint><HeatMap a={a} /></Panel>
+        {fam === "pm" && skills.length > 0 && <Panel title="الدقة في كل مهارة"><HBars items={skills.map((v) => ({ label: v.name, p: v.p }))} /></Panel>}
+        {fam === "x" && <><Panel title="الدقة في كل جدول"><ColChart tables={a.tables} /></Panel>
+        <Panel title="خريطة الإتقان"><Hint>الصفوف: الجدول · الأعمدة: العدد المضروب فيه. القسمة تُحسب على حقيقة الضرب المقابلة.</Hint><HeatMap a={a} /></Panel></>}
         <h2>الاختبارات</h2>
         <List>{a.h.slice().reverse().map((e) => (
           <Row key={e.t.id}><OpTag op={e.t.op} />
@@ -50,7 +53,7 @@ export function Student({ r }) {
               <Button variant="outline" size="sm" onClick={() => go("result", e.t.id, null, s.id)}>الأخطاء</Button></>}</RowActions>
           </Row>
         ))}</List>
-      </> : <Empty title="لم يُختبر هذا الطالب بعد">ستظهر هنا درجاته وأخطاؤه وخطته العلاجية بعد أول اختبار.</Empty>}
+      </> : <Empty title={`لم يُختبر هذا الطالب في ${FAM_NAME[fam]} بعد`}>ستظهر هنا درجاته وأخطاؤه وخطته العلاجية بعد أول اختبار.</Empty>}
     </Shell>
   );
 }
@@ -58,8 +61,7 @@ export function Student({ r }) {
 export function Bulk({ r }) {
   const c = db.data.classes[r.id];
   // نوع الأوراق حسب الاختبار: الضرب والقسمة أو الجمع والطرح
-  const fams = c ? [...new Set(classTests(c.id).filter((t) => Object.values(t.results || {}).some((x) => x.status === "done")).map((t) => famOf(t.op)))] : [];
-  const fam = fams.includes(r.id2) ? r.id2 : fams[0] || "x";
+  const fam = r.id2 === "pm" || r.id2 === "x" ? r.id2 : getFam();
   const rows = c ? classStudents(c.id).map((s) => ({ s, a: studentAgg(s.id, null, fam) })) : [];
   const [sel, setSel] = useState(() => new Set(rows.filter((x) => x.a.done.length).map((x) => x.s.id)));
   const [busy, run] = useBusy();
@@ -68,10 +70,8 @@ export function Bulk({ r }) {
   const toggle = (id) => setSel((p) => { const q = new Set(p); q.has(id) ? q.delete(id) : q.add(id); return q; });
   return (
     <Shell title="أوراق عمل الفصل" back={["class", c.id]}>
-      <h1>أوراق عمل · {c.name}</h1>
-      {fams.length > 1 && <ToggleGroup type="single" value={fam} onValueChange={(v) => v && go("bulk", c.id, null, v, { replace: true })} className="grid w-full grid-cols-2 gap-2" dir="rtl">
-        {["x", "pm"].map((f) => <ToggleGroupItem key={f} value={f} className="h-12 rounded-xl border-2 text-base data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">{FAM_NAME[f]}</ToggleGroupItem>)}
-      </ToggleGroup>}
+      <h1>أوراق عمل {FAM_NAME[fam]} · {c.name}</h1>
+
       <p className="text-muted-foreground">كل طالب يحصل على ورقة عمل خاصة بأخطائه. أزل العلامة عن الطالب الذي لا تريد له ورقة.</p>
       <div className="flex flex-wrap items-center gap-2"><Button variant="outline" size="sm" onClick={() => setSel(new Set(all))}>تحديد الكل</Button>
         <Button variant="outline" size="sm" onClick={() => setSel(new Set())}>إلغاء الكل</Button><Hint>المحدد: {n(sel.size)} طالب</Hint></div>

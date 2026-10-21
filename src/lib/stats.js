@@ -3,7 +3,8 @@ import { db } from "./store.js";
 import { n, fmtDate, shuffle, T10, isTables } from "./util.js";
 
 export const classStudents = (cid) => Object.values(db.data.students).filter((s) => s.classId === cid).sort((a, b) => a.name.localeCompare(b.name, "ar"));
-export const classTests = (cid) => Object.values(db.data.tests).filter((t) => t.classId === cid).sort((a, b) => b.date - a.date);
+// fam: "x" أو "pm" لاختبارات قسم واحد فقط
+export const classTests = (cid, fam) => Object.values(db.data.tests).filter((t) => t.classId === cid && (!fam || (fam === "x") === isTables(t.op))).sort((a, b) => b.date - a.date);
 
 export function sc(r) {
   if (!r || r.status !== "done") return null;
@@ -55,9 +56,11 @@ export function studentAgg(sid, ids, fam) {
   const ps = done.map((e) => e.x.p);
   return { h, done, absent, facts, tables, avg: ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null, avgMs: msn ? ms / msn : null, first: ps[0], last: ps[ps.length - 1] };
 }
-export function reportIds(cid) {
-  const c = db.data.classes[cid]; const all = classTests(cid).map((t) => t.id);
-  return Array.isArray(c?.reportSel) ? c.reportSel.filter((id) => all.includes(id)) : all;
+// اختيار الاختبارات المشمولة في التقرير الشامل محفوظ لكل قسم على حدة
+export const reportKey = (fam) => (fam === "pm" ? "reportSelPm" : "reportSel");
+export function reportIds(cid, fam = "x") {
+  const c = db.data.classes[cid]; const all = classTests(cid, fam).map((t) => t.id); const sel = c?.[reportKey(fam)];
+  return Array.isArray(sel) ? sel.filter((id) => all.includes(id)) : all;
 }
 export function periodText(tests) {
   if (!tests.length) return "";

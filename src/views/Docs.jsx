@@ -4,6 +4,7 @@ import { go, bulk } from "../lib/router.js";
 import { n, pct, secs, opName, fmtDate, shuffle, scoreColor, T10, toast, testScope, isTables } from "../lib/util.js";
 import { testStats, sc, qText, classStudents, classAgg, reportIds, periodText, studentAgg } from "../lib/stats.js";
 import { planData, TRICKS, explainFact, splitFact, targetFacts } from "../lib/plan.js";
+import { getFam } from "../lib/section.js";
 import { arithPlanData, arithTargets, arithChallenge, arithText, arithAns, explainArith, sampleSkill, SKILLS, FAM_NAME } from "../lib/arith.js";
 import { Icon, Kpi, Logo, Btn, useBusy, nextFrame, Spinner } from "../components/app.jsx";
 import { Progress } from "../components/ui/progress.jsx";
@@ -53,16 +54,16 @@ function TestDoc({ t }) {
   </>;
 }
 
-function ClassDoc({ cid }) {
-  const c = db.data.classes[cid]; const studs = classStudents(cid); const ids = reportIds(cid); const ag = classAgg(cid, ids);
+function ClassDoc({ cid, fam }) {
+  const c = db.data.classes[cid]; const studs = classStudents(cid); const ids = reportIds(cid, fam); const ag = classAgg(cid, ids);
   const sa = studs.map((s) => ({ s, a: studentAgg(s.id, ids) })); const avgs = sa.map((x) => x.a.avg).filter((x) => x != null);
   return <>
     <section className="sheet"><DocHead />
-      <h1 className="dtitle">التقرير الشامل · {c.name}</h1><p className="dsub">{n(ag.tests.length)} اختبار · {n(studs.length)} طالب · {periodText(ag.tests)}</p>
+      <h1 className="dtitle">التقرير الشامل · {FAM_NAME[fam]} · {c.name}</h1><p className="dsub">{n(ag.tests.length)} اختبار · {n(studs.length)} طالب · {periodText(ag.tests)}</p>
       <div className="kpis"><Kpi v={pct(avgs.length ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null)} label="متوسط الفصل" /><Kpi v={n(avgs.filter((x) => x >= 90).length)} label="متقن" />
         <Kpi v={n(avgs.filter((x) => x >= 70 && x < 90).length)} label="جيد" /><Kpi v={n(avgs.filter((x) => x < 70).length)} label="يحتاج دعماً" /></div>
       <Sec title="متوسط الفصل في كل اختبار"><LineChart points={ag.tests.map((t) => ({ label: fmtDate(t.date, true), p: testStats(t).avg })).filter((x) => x.p != null)} /></Sec>
-      <Sec title="دقة الفصل في كل جدول"><ColChart tables={ag.tables} /></Sec>
+      {fam === "x" && <Sec title="دقة الفصل في كل جدول"><ColChart tables={ag.tables} /></Sec>}
       <Sec title="أكثر الأسئلة خطأً"><Facts list={ag.facts} /></Sec>
     </section>
     <section className="sheet">
@@ -72,17 +73,18 @@ function ClassDoc({ cid }) {
   </>;
 }
 
-function StudentDoc({ sid }) {
-  const s = db.data.students[sid]; const c = db.data.classes[s.classId]; const a = studentAgg(sid);
+function StudentDoc({ sid, fam }) {
+  const s = db.data.students[sid]; const c = db.data.classes[s.classId]; const a = studentAgg(sid, null, fam);
+  const skills = fam === "pm" ? arithPlanData(sid)?.tbl || [] : [];
   return <>
     <section className="sheet"><DocHead />
-      <h1 className="dtitle">تقرير الطالب · {s.name}</h1><p className="dsub">{c?.name}</p>
+      <h1 className="dtitle">تقرير الطالب · {FAM_NAME[fam]} · {s.name}</h1><p className="dsub">{c?.name}</p>
       <div className="kpis"><Kpi v={pct(a.avg)} label="المتوسط" /><Kpi v={secs(a.avgMs)} label="زمن الإجابة" /><Kpi v={n(a.done.length)} label="اختبار" /><Kpi v={n(a.absent)} label="غياب" /></div>
       <Sec title="تطور الدرجات"><LineChart points={a.done.map((e) => ({ label: fmtDate(e.t.date, true), p: e.x.p }))} /></Sec>
-      <Sec title="الدقة في كل جدول"><ColChart tables={a.tables} /></Sec>
-      <Sec title="خريطة الإتقان"><HeatMap a={a} /></Sec>
+      {fam === "x" ? <><Sec title="الدقة في كل جدول"><ColChart tables={a.tables} /></Sec>
+      <Sec title="خريطة الإتقان"><HeatMap a={a} /></Sec></> : skills.length > 0 && <Sec title="الدقة في كل مهارة"><HBars items={skills.map((v) => ({ label: v.name, p: v.p }))} /></Sec>}
     </section>
-    <section className="sheet"><Sec title="سجل الاختبارات"><table className="dtable"><thead><tr><th>التاريخ</th><th>النوع</th><th>الجداول</th><th>الدرجة</th><th>الأسئلة الخاطئة</th></tr></thead><tbody>
+    <section className="sheet"><Sec title="سجل الاختبارات"><table className="dtable"><thead><tr><th>التاريخ</th><th>النوع</th><th>{fam === "x" ? "الجداول" : "الأعداد"}</th><th>الدرجة</th><th>الأسئلة الخاطئة</th></tr></thead><tbody>
       {a.h.map((e) => <tr key={e.t.id}><td>{fmtDate(e.t.date, true)}</td><td>{opName(e.t.op)}</td><td>{testScope(e.t, true)}</td>
         <td>{e.r.status === "absent" ? "غائب" : `${n(e.x.c)}/${n(e.x.total)} (${pct(e.x.p)})`}</td>
         <td className="r" dir="rtl">{e.x ? e.r.items.filter((q) => !q.ok).map(qText).join("، ") || "—" : "—"}</td></tr>)}
@@ -324,11 +326,12 @@ export default function DocView({ r }) {
   };
   const printNow = () => runPrint(async () => { await nextFrame(); await document.fonts?.ready; window.print(); });
   const kind = r.tab, id = r.id; let title = "", back = ["home"], body = null, extra = null;
+  // fam: القسم (x = الضرب والقسمة، pm = الجمع والطرح) من الرابط، وإلا القسم الحالي
+  const fam = r.id2 === "pm" || r.id2 === "x" ? r.id2 : getFam();
   if (kind === "test" && db.data.tests[id]) { title = "تقرير الاختبار"; back = ["test", id]; body = <TestDoc t={db.data.tests[id]} />; }
-  else if (kind === "class" && db.data.classes[id]) { title = "تقرير الفصل"; back = ["class", id, "report"]; body = <ClassDoc cid={id} />; }
-  else if (kind === "student" && db.data.students[id]) { title = "تقرير الطالب"; back = ["student", id]; body = <StudentDoc sid={id} />; }
+  else if (kind === "class" && db.data.classes[id]) { title = "تقرير الفصل"; back = ["class", id, "report"]; body = <ClassDoc cid={id} fam={fam} />; }
+  else if (kind === "student" && db.data.students[id]) { title = "تقرير الطالب"; back = ["student", id]; body = <StudentDoc sid={id} fam={fam} />; }
   // fam: نوع الخطة/الورقة حسب الاختبار (x = الضرب والقسمة، pm = الجمع والطرح)
-  const fam = r.id2 === "pm" ? "pm" : "x";
   const getPlan = (sid) => (fam === "pm" ? arithPlanData(sid) : planData(sid));
   const Plan = fam === "pm" ? ArithPlanDoc : PlanDoc, Sheet = fam === "pm" ? ArithSheetDoc : SheetDoc;
   const famTag = fam === "pm" ? ` · ${FAM_NAME.pm}` : "";

@@ -4,8 +4,8 @@ import { n, isTables, shuffle } from "./util.js";
 import { studentHistory } from "./stats.js";
 
 // عائلة الاختبار: x = الضرب والقسمة، pm = الجمع والطرح
-export const famOf = (op) => (isTables(op) ? "x" : "pm");
-export const FAM_NAME = { x: "الضرب والقسمة", pm: "الجمع والطرح" };
+import { famOf } from "./section.js";
+export { famOf, FAM_NAME } from "./section.js";
 
 const sum = (q) => q.t + q.m;
 const carry = (q) => (q.t % 10) + (q.m % 10) >= 10;

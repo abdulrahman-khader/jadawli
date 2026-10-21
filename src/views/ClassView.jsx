@@ -2,7 +2,9 @@ import { useState } from "react";
 import { db, put, del } from "../lib/store.js";
 import { go } from "../lib/router.js";
 import { n, pct, secs, uid, toast, opSym, opName, fmtDate, scoreColor, downloadCSV, testScope } from "../lib/util.js";
-import { classStudents, classTests, testStats, studentAgg, classAgg, reportIds, periodText, sc } from "../lib/stats.js";
+import { classStudents, classTests, testStats, studentAgg, classAgg, reportIds, reportKey, periodText, sc } from "../lib/stats.js";
+import { getFam, FAM_NAME } from "../lib/section.js";
+import { SectionSwitch } from "../components/section.jsx";
 import {
   Shell, Avatar, Stars, Icon, Empty, Kpi, OpTag, ConfirmButton, PageHead, Panel, List, Row, RowMain, RowActions, Btn, useBusy, nextFrame, Hint,
 } from "../components/app.jsx";
@@ -21,39 +23,41 @@ export default function ClassView({ r }) {
   const c = db.data.classes[r.id];
   const [rename, setRename] = useState(false);
   if (!c) return <Shell title="الفصل" back={["home"]}><Empty title="هذا الفصل غير موجود" /></Shell>;
-  const tab = r.tab || "students"; const studs = classStudents(c.id); const tests = classTests(c.id);
+  // القسم الحالي: كل ما تحت الزرين (الاختبارات، التقرير، الترتيب، أوراق العمل) خاص به
+  const fam = getFam(); const tab = r.tab || "students"; const studs = classStudents(c.id); const allTests = classTests(c.id); const tests = classTests(c.id, fam);
   return (
     <Shell title={c.name} back={["home"]}>
-      <PageHead icon={<Avatar name={c.name} />} title={c.name} sub={`${n(studs.length)} طالب · ${n(tests.length)} اختبار`}>
+      <PageHead icon={<Avatar name={c.name} />} title={c.name} sub={`${n(studs.length)} طالب · ${n(allTests.length)} اختبار`}>
         <Button variant="outline" size="sm" onClick={() => setRename(!rename)}><Icon name="edit" /> تعديل الاسم</Button>
         <ConfirmButton className="text-destructive" confirmText={`حذف فصل «${c.name}»؟`} desc="سيُحذف الفصل وكل طلابه واختباراته نهائياً." action="حذف الفصل"
-          onConfirm={() => { studs.forEach((s) => del("students", s.id)); tests.forEach((t) => del("tests", t.id)); del("classes", c.id); toast("حُذف الفصل"); go("home"); }}>
+          onConfirm={() => { studs.forEach((s) => del("students", s.id)); allTests.forEach((t) => del("tests", t.id)); del("classes", c.id); toast("حُذف الفصل"); go("home"); }}>
           <Icon name="trash" /> حذف</ConfirmButton>
       </PageHead>
       {rename && <Panel><form className="grid gap-2" onSubmit={(e) => { e.preventDefault(); c.name = String(new FormData(e.currentTarget).get("name")).trim() || c.name; put("classes", c); setRename(false); toast("حُفظ اسم الفصل"); }}>
         <Label htmlFor="renameIn">اسم الفصل</Label>
         <div className="flex flex-wrap gap-2"><Input id="renameIn" name="name" className="h-10 flex-[1_1_180px]" defaultValue={c.name} required maxLength={40} autoFocus /><Button size="lg">حفظ</Button></div></form></Panel>}
-      <Button variant="warm" size="xl" disabled={!studs.length} onClick={() => go("newTest", c.id)}><Icon name="plus" /> اختبار جديد</Button>
+      <SectionSwitch fam={fam} />
+      <Button variant="warm" size="xl" disabled={!studs.length} onClick={() => go("newTest", c.id)}><Icon name="plus" /> اختبار {FAM_NAME[fam]} جديد</Button>
       {!studs.length && <Hint>أضف الطلاب أولاً لتتمكن من إنشاء اختبار.</Hint>}
-      {tests.length > 0 && <Button variant="outline" size="xl" onClick={() => go("bulk", c.id)}><Icon name="sheet" /> أوراق عمل لطلاب الفصل</Button>}
+      {tests.length > 0 && <Button variant="outline" size="xl" onClick={() => go("bulk", c.id, null, fam)}><Icon name="sheet" /> أوراق عمل لطلاب الفصل</Button>}
       <Tabs value={tab} onValueChange={(k) => go("class", c.id, k)} dir="rtl">
         <TabsList className="grid h-11 w-full grid-cols-4">
           <TabsTrigger value="students">الطلاب</TabsTrigger><TabsTrigger value="tests">الاختبارات</TabsTrigger>
           <TabsTrigger value="report">التقرير الشامل</TabsTrigger><TabsTrigger value="rank">الترتيب</TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab === "students" ? <Students c={c} studs={studs} /> : tab === "tests" ? <Tests tests={tests} /> : tab === "report" ? <Report c={c} studs={studs} tests={tests} /> : <Rank studs={studs} />}
+      {tab === "students" ? <Students c={c} studs={studs} fam={fam} /> : tab === "tests" ? <Tests tests={tests} fam={fam} /> : tab === "report" ? <Report c={c} studs={studs} tests={tests} fam={fam} /> : <Rank studs={studs} fam={fam} />}
     </Shell>
   );
 }
 
-function Students({ c, studs }) {
+function Students({ c, studs, fam }) {
   const [bulkOpen, setBulkOpen] = useState(false);
   const add = (name) => put("students", { id: uid(), name: name.slice(0, 50), classId: c.id, created: Date.now() });
   return (
     <>
       {studs.length ? <List>{studs.map((s) => {
-        const a = studentAgg(s.id);
+        const a = studentAgg(s.id, null, fam);
         return (
           <Row key={s.id}><Avatar name={s.name} />
             <RowMain title={s.name} onClick={() => go("student", s.id)}
@@ -86,8 +90,8 @@ function Students({ c, studs }) {
   );
 }
 
-function Tests({ tests }) {
-  if (!tests.length) return <Empty title="لا توجد اختبارات بعد">اضغط «اختبار جديد» لاختيار الجداول والبدء.</Empty>;
+function Tests({ tests, fam }) {
+  if (!tests.length) return <Empty title={`لا توجد اختبارات ${FAM_NAME[fam]} بعد`}>اضغط «اختبار جديد» للبدء.</Empty>;
   return <List>{tests.map((t) => {
     const st = testStats(t);
     return (
@@ -116,12 +120,12 @@ export function Matrix({ studs, asc, ids, links }) {
   );
 }
 
-function Report({ c, studs, tests }) {
+function Report({ c, studs, tests, fam }) {
   const [open, setOpen] = useState(false);
   const [busyX, runX] = useBusy();
-  if (!tests.length) return <Empty title="لا يوجد ما يُعرض">يظهر هنا تقرير يجمع كل اختبارات الفصل بعد أول اختبار.</Empty>;
-  const ids = reportIds(c.id); const ag = classAgg(c.id, ids); const avgs = studs.map((s) => studentAgg(s.id, ids).avg).filter((x) => x != null);
-  const setSel = (sel) => { c.reportSel = sel; put("classes", c); };
+  if (!tests.length) return <Empty title="لا يوجد ما يُعرض">يظهر هنا تقرير يجمع اختبارات {FAM_NAME[fam]} للفصل بعد أول اختبار.</Empty>;
+  const ids = reportIds(c.id, fam); const ag = classAgg(c.id, ids); const avgs = studs.map((s) => studentAgg(s.id, ids).avg).filter((x) => x != null);
+  const setSel = (sel) => { c[reportKey(fam)] = sel; put("classes", c); };
   const quick = (m) => {
     const now = new Date();
     const inMonth = (d, off) => { const x = new Date(now.getFullYear(), now.getMonth() + off, 1); const t = new Date(d); return t.getFullYear() === x.getFullYear() && t.getMonth() === x.getMonth(); };
@@ -135,7 +139,7 @@ function Report({ c, studs, tests }) {
     const asc = ag.tests;
     const rows = [["الطالب", ...asc.map((t) => `${opName(t.op)} ${new Date(t.date).toISOString().slice(0, 10)}`), "المتوسط"]];
     studs.forEach((s) => { const a = studentAgg(s.id, ids); rows.push([s.name, ...asc.map((t) => { const rr = t.results?.[s.id]; const x = sc(rr); return rr?.status === "absent" ? "غائب" : x ? Math.round(x.p) + "%" : ""; }), a.avg != null ? Math.round(a.avg) + "%" : ""]); });
-    downloadCSV(`تقرير ${c.name}`, rows); toast("نُزّل ملف Excel");
+    downloadCSV(`تقرير ${c.name} - ${FAM_NAME[fam]}`, rows); toast("نُزّل ملف Excel");
   });
   return (
     <>
@@ -165,12 +169,12 @@ function Report({ c, studs, tests }) {
       </Panel>
       {!ids.length ? <Empty title="لم تختر أي اختبار">اختر الاختبارات التي تريدها في التقرير.</Empty> : <>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => go("doc", c.id, "class")}><Icon name="pdf" /> تقرير الفصل PDF</Button>
+          <Button onClick={() => go("doc", c.id, "class", fam)}><Icon name="pdf" /> تقرير الفصل PDF</Button>
           <Btn variant="outline" loading={busyX} onClick={excel}><Icon name="xls" /> Excel</Btn>
         </div>
         <div className="kpis"><Kpi v={n(ag.tests.length)} label="اختبار" /><Kpi v={pct(avgs.length ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null)} label="متوسط الفصل" /><Kpi v={n(avgs.filter((x) => x < 70).length)} label="طالب يحتاج دعماً" /></div>
         <Panel title="متوسط الفصل في كل اختبار"><LineChart points={ag.tests.map((t) => ({ label: fmtDate(t.date, true), p: testStats(t).avg })).filter((x) => x.p != null)} /></Panel>
-        <Panel title="دقة الفصل في كل جدول"><ColChart tables={ag.tables} /></Panel>
+        {fam === "x" && <Panel title="دقة الفصل في كل جدول"><ColChart tables={ag.tables} /></Panel>}
         <h2>درجات الاختبارات المختارة</h2><Matrix studs={studs} asc={ag.tests} ids={ids} links />
         <Panel title="أكثر الأسئلة خطأً في الفصل"><Facts list={ag.facts} lim={15} /></Panel>
       </>}
@@ -178,8 +182,8 @@ function Report({ c, studs, tests }) {
   );
 }
 
-function Rank({ studs }) {
-  const rows = studs.map((s) => ({ s, a: studentAgg(s.id) })).filter((x) => x.a.done.length).sort((x, y) => y.a.avg - x.a.avg || (x.a.avgMs ?? 1e9) - (y.a.avgMs ?? 1e9));
+function Rank({ studs, fam }) {
+  const rows = studs.map((s) => ({ s, a: studentAgg(s.id, null, fam) })).filter((x) => x.a.done.length).sort((x, y) => y.a.avg - x.a.avg || (x.a.avgMs ?? 1e9) - (y.a.avgMs ?? 1e9));
   if (!rows.length) return <Empty title="الترتيب يظهر بعد أول اختبار">يُرتَّب الطلاب حسب متوسط الدرجة ثم سرعة الإجابة.</Empty>;
   return (
     <>

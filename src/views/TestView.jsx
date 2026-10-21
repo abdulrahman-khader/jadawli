@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { db, put, del } from "../lib/store.js";
 import { useRemoteHost } from "../lib/remote.js";
-import { famOf } from "../lib/arith.js";
+import { famOf, setFam } from "../lib/section.js";
 import { RemoteButton, RemoteQr, studentList } from "../components/remote-qr.jsx";
 import { go } from "../lib/router.js";
 import { n, pct, secs, toast, opName, fmtDate, downloadCSV, isAr, testScope, isTables } from "../lib/util.js";
@@ -24,6 +24,7 @@ export default function TestView({ r }) {
       if (cmd === "hello") { setQrOpen(false); toast("تم ربط الجوال ✓"); }
       else if (cmd === "pick" && t && d.sid && db.data.students[d.sid]) go("run", t.id, null, d.sid);
     });
+  if (t) setFam(famOf(t.op), false);
   if (!t) return <Shell title="الاختبار" back={["home"]}><Empty title="هذا الاختبار غير موجود" /></Shell>;
   const c = db.data.classes[t.classId]; const st = testStats(t);
   const next = st.studs.find((s) => !t.results?.[s.id]);
