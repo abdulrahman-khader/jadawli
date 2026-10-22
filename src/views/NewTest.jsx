@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { db, put, settings } from "../lib/store.js";
 import { go } from "../lib/router.js";
-import { n, uid, toast, T10, isTables, LEVELS } from "../lib/util.js";
-import { classTests, buildPool } from "../lib/stats.js";
+import { n, pct, uid, toast, T10, isTables, LEVELS } from "../lib/util.js";
+import { classTests, uniquePool, factLevel } from "../lib/stats.js";
 import { cn } from "../lib/utils.js";
 import { getFam, FAM_NAME } from "../lib/section.js";
 import { Shell, Icon, Empty, Panel, Btn } from "../components/app.jsx";
@@ -43,7 +43,8 @@ export default function NewTest({ r }) {
   const [level, setLevel] = useState(last?.level || 1);
   if (!c) return <Shell title="اختبار جديد" back={["home"]}><Empty title="هذا الفصل غير موجود" /></Shell>;
 
-  const pool = buildPool(tables, strict); const ex = T10.filter((t) => !tables.includes(t));
+  // الأسئلة المختلفة فعلاً (٤ × ٥ و٥ × ٤ سؤال واحد) وعدد الصعبة منها
+  const pool = uniquePool(tables, strict); const hardN = pool.filter((p) => factLevel(p.t, p.m) === "hard").length; const ex = T10.filter((t) => !tables.includes(t));
   function create(e) {
     e.preventDefault();
     const tb = isTables(op);
@@ -90,9 +91,10 @@ export default function NewTest({ r }) {
           <SwitchRow checked={strict} onChange={setStrict} title="استبعاد نهائي للجداول غير المختارة"
             desc="عند التشغيل: إذا لم تختر جدول ٥ لن يظهر أي سؤال فيه ٥ أبداً، حتى ٩ × ٥. وعند الإيقاف: قد يظهر ٩ × ٥ ضمن جدول ٩." />
           <div className="rounded-xl bg-secondary px-3.5 py-3 font-bold text-primary">{!tables.length ? <span className="text-destructive">اختر جدولاً واحداً على الأقل.</span> :
-            <span>الأسئلة المختلفة المتاحة: {n(pool.length)}{strict && ex.length ? ` · لن يظهر أي سؤال فيه: ${ex.map(n).join("، ")}` : ""}{count > pool.length ? " · سيتكرر بعضها" : ""}</span>}</div>
+            <span>الأسئلة المختلفة المتاحة: {n(pool.length)}{strict && ex.length ? ` · لن يظهر أي سؤال فيه: ${ex.map(n).join("، ")}` : ""}{count > pool.length ? " · سيتكرر بعضها" : ""}{hardN < Math.round(count * 0.4) ? " · الأسئلة الصعبة قليلة في هذه الجداول، نكمل من المتوسطة" : ""}</span>}</div>
         </Panel>
         </>}
+        <p className="rounded-xl border bg-card px-4 py-3 text-sm text-muted-foreground"><b className="text-foreground">توزيع الأسئلة لكل طالب:</b> {pct(40)} صعبة · {pct(40)} متوسطة · {pct(20)} سهلة، ولا يتكرر السؤال على الطالب نفسه (إذا جاءه {n(4)} × {n(5)} لا يأتيه {n(5)} × {n(4)}).</p>
         <Panel title="الإعدادات">
           <div className="flex flex-wrap items-center justify-between gap-2"><label htmlFor="cnt">عدد الأسئلة لكل طالب</label><Stepper id="cnt" value={count} set={setCount} lo={1} hi={100} /></div>
           <div className="flex flex-wrap items-center justify-between gap-2"><label htmlFor="sec">زمن السؤال (ثانية)</label><Stepper id="sec" value={seconds} set={setSeconds} lo={3} hi={60} /></div>

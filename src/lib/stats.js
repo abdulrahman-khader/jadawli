@@ -77,37 +77,78 @@ export function classAgg(cid, ids) {
   return { tests, tables, facts: Object.values(facts).sort((a, b) => b.wrong - a.wrong) };
 }
 
+// ---------- توليد الأسئلة ----------
+// كل اختبار: ٤٠٪ صعبة، ٤٠٪ متوسطة، ٢٠٪ سهلة، وبدون تكرار للطالب (٤ × ٥ و٥ × ٤ يُعدّان سؤالاً واحداً).
+// إذا لم تكفِ أسئلة مستوى نكمل من المستوى المجاور، وإذا لم تكفِ كل الأسئلة المختلفة يتكرر بعضها فقط بعد استعمالها كلها.
+export const MIX = { hard: 0.4, mid: 0.4, easy: 0.2 };
+const EASY_F = [1, 2, 5, 10], MID_F = [3, 4, 9];
+// صعوبة حقيقة الضرب/القسمة حسب أسهل العددين: سهلة إذا فيها ١ أو ٢ أو ٥ أو ١٠، متوسطة إذا فيها ٣ أو ٤ أو ٩، وصعبة إذا العددان من ٦ و٧ و٨
+export const factLevel = (t, m) => (EASY_F.includes(t) || EASY_F.includes(m) ? "easy" : MID_F.includes(t) || MID_F.includes(m) ? "mid" : "hard");
+// صعوبة الجمع والطرح
+export function arithLevel(op, a, b, level) {
+  if (level === 2) {
+    if (op === "add") return (a % 10) + (b % 10) < 10 ? "easy" : a + b < 100 ? "mid" : "hard";
+    const gap = (b % 10) - (a % 10); return gap <= 0 ? "easy" : gap <= 4 ? "mid" : "hard";
+  }
+  if (op === "add") { const s = a + b; return s <= 10 ? "easy" : a === b || Math.abs(a - b) === 1 || Math.max(a, b) === 9 ? "mid" : "hard"; }
+  return b <= 2 || a === b || a - b <= 1 ? "easy" : b >= 4 && a - b >= 3 ? "hard" : "mid";
+}
+
 export function buildPool(tables, strict) {
   const pool = [];
   for (const a of tables) for (const m of T10) { if (strict && !tables.includes(m)) continue; pool.push({ t: a, m }); }
   return pool;
 }
-// الجمع والطرح: «عدد مع عدد» من ١ إلى ٩، و«عددين مع عددين» من ١٠ إلى ٩٩. في الطرح العدد الأول هو الأكبر دائماً
-function arithQuestions(t) {
-  const out = []; const used = new Set(); const mk = (a, b) => ({ t: a, m: b, op: t.op, sw: false, ok: null, ms: 0, to: false });
-  if ((t.level || 1) === 1) {
-    const pool = [];
-    for (let a = 1; a <= 9; a++) for (let b = 1; b <= 9; b++) if (t.op === "add" || b <= a) pool.push([a, b]);
-    let bag = [];
-    while (out.length < t.count) { if (!bag.length) bag = shuffle(pool.slice()); const [a, b] = bag.shift(); out.push(mk(a, b)); }
-    return out;
-  }
-  const r = () => 10 + Math.floor(Math.random() * 90);
-  for (let tries = 0; out.length < t.count && tries < 5000; tries++) {
-    let a = r(), b = r(); if (t.op === "sub" && b > a) [a, b] = [b, a];
-    if (t.op === "sub" && a === b) continue;
-    const k = a + "|" + b; if (used.has(k)) continue; used.add(k); out.push(mk(a, b));
-  }
+// الحقائق المختلفة فقط: ٤ × ٥ و٥ × ٤ حقيقة واحدة
+export function uniquePool(tables, strict) {
+  const seen = new Set(), out = [];
+  for (const p of shuffle(buildPool(tables, strict))) { const k = Math.min(p.t, p.m) + "|" + Math.max(p.t, p.m); if (!seen.has(k)) { seen.add(k); out.push(p); } }
   return out;
+}
+
+// يختار count سؤالاً من مجموعات المستويات حسب النسب، ويكمل من المستوى المجاور عند النقص
+function pickByLevel(buckets, count) {
+  const want = { hard: Math.round(count * MIX.hard), mid: Math.round(count * MIX.mid) }; want.easy = count - want.hard - want.mid;
+  const b = { hard: shuffle(buckets.hard.slice()), mid: shuffle(buckets.mid.slice()), easy: shuffle(buckets.easy.slice()) };
+  const out = [];
+  for (const lv of ["hard", "mid", "easy"]) out.push(...b[lv].splice(0, want[lv]));
+  for (const lv of ["mid", "hard", "easy"]) while (out.length < count && b[lv].length) out.push(b[lv].shift()); // التعويض عند النقص
+  return out;
+}
+// ترتيب عشوائي بدون سؤالين متطابقين متتاليين
+function spread(list, same) {
+  const out = shuffle(list.slice());
+  for (let i = 1; i < out.length; i++) if (same(out[i], out[i - 1])) { const j = out.findIndex((x, k) => k > i && !same(x, out[i - 1])); if (j > 0) [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+
+function arithQuestions(t) {
+  const level = t.level || 1; const mk = (a, b) => ({ t: a, m: b, op: t.op, sw: false, ok: null, ms: 0, to: false });
+  const key = (a, b) => (t.op === "add" ? Math.min(a, b) + "|" + Math.max(a, b) : a + "|" + b);
+  const buckets = { hard: [], mid: [], easy: [] }; const seen = new Set();
+  const addQ = (a, b) => { const k = key(a, b); if (seen.has(k)) return; seen.add(k); buckets[arithLevel(t.op, a, b, level)].push([a, b]); };
+  if (level === 1) { for (let a = 1; a <= 9; a++) for (let b = 1; b <= 9; b++) if (t.op === "add" || b <= a) addQ(a, b); }
+  else {
+    // أعداد من منزلتين: نسحب عينة كبيرة كافية لكل مستوى
+    const r = () => 10 + Math.floor(Math.random() * 90);
+    for (let i = 0; i < 4000 && (buckets.hard.length < t.count || buckets.mid.length < t.count || buckets.easy.length < t.count); i++) {
+      let a = r(), b = r(); if (t.op === "sub") { if (a === b) continue; if (b > a) [a, b] = [b, a]; } addQ(a, b);
+    }
+  }
+  let picked = pickByLevel(buckets, t.count);
+  if (!picked.length) return [];
+  while (picked.length < t.count) picked = picked.concat(shuffle(picked).slice(0, t.count - picked.length)); // نادر: أسئلة مختلفة غير كافية
+  // في الجمع نعرض العددين بترتيب عشوائي (٥ + ٤ أو ٤ + ٥)، والسؤال نفسه لا يتكرر
+  return spread(picked, (x, y) => x[0] === y[0] && x[1] === y[1]).map(([a, b]) => (t.op === "add" && Math.random() < 0.5 ? mk(b, a) : mk(a, b)));
 }
 export function makeQuestions(t) {
   if (!isTables(t.op)) return arithQuestions(t);
-  const pool = buildPool(t.tables, t.strict); if (!pool.length) return [];
-  const out = []; let bag = [];
-  while (out.length < t.count) {
-    if (!bag.length) { bag = shuffle(pool.slice()); const l = out[out.length - 1]; if (l && bag.length > 1 && bag[0].t === l.t && bag[0].m === l.m) bag.push(bag.shift()); }
-    const p = bag.shift();
-    out.push({ t: p.t, m: p.m, op: t.op, sw: t.op === "mul" && t.swap ? Math.random() < 0.5 : false, ok: null, ms: 0, to: false });
-  }
-  return out;
+  const uniq = uniquePool(t.tables, t.strict); if (!uniq.length) return [];
+  const buckets = { hard: [], mid: [], easy: [] };
+  for (const p of uniq) buckets[factLevel(p.t, p.m)].push(p);
+  let picked = pickByLevel(buckets, t.count);
+  // إذا طلب المعلم أسئلة أكثر من الحقائق المختلفة المتاحة، نكرر بعضها فقط بعد استعمالها كلها
+  while (picked.length < t.count) picked = picked.concat(shuffle(uniq).slice(0, t.count - picked.length));
+  return spread(picked, (x, y) => x.t === y.t && x.m === y.m)
+    .map((p) => ({ t: p.t, m: p.m, op: t.op, sw: t.op === "mul" && t.swap ? Math.random() < 0.5 : false, ok: null, ms: 0, to: false }));
 }
