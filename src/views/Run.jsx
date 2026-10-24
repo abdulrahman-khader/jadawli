@@ -58,6 +58,13 @@ export default function Run({ r }) {
   const onCmd = (c, d = {}) => {
     if (c === "hello") { setQrOpen(false); toast("تم ربط الجوال ✓"); return; }
     if (c === "pick") { if (run.phase !== "q" && d.sid && d.sid !== s.id && db.data.students[d.sid]) go("run", t.id, null, d.sid, { replace: true }); return; }
+    // تعديل الدرجة من الجوال: قلب علامة سؤال أُجيب عنه (أثناء الاختبار أو بعد انتهائه)
+    if (c === "flip") {
+      const j = d.j;
+      if (run.phase === "q" && j >= 0 && j < answered()) { run.qs[j].ok = !run.qs[j].ok; force(); }
+      else if (run.phase === "done") { const rr = t.results?.[s.id]; const q = rr?.items?.[j]; if (q) { q.ok = !q.ok; rr.edited = true; put("tests", t); force(); } }
+      return;
+    }
     if (run.phase === "ready") {
       if (c === "start" && run.qs.length) { run.phase = "q"; begin(); }
       else if (c === "absent") { t.results = t.results || {}; t.results[s.id] = { status: "absent", at: Date.now() }; put("tests", t); goNext(); }
@@ -69,9 +76,13 @@ export default function Run({ r }) {
     } else if (run.phase === "done" && c === "nextStudent") goNext();
   };
   useRemoteHost(remoteState(), onCmd);
+  // عدد الأسئلة التي أُجيب عنها (السؤال الحالي يُحسب بعد ظهور جوابه)
+  function answered() { return run.i + (run.reveal ? 1 : 0); }
   function remoteState() {
     if (!t || !s || !run) return { phase: "idle" };
     const q = run.phase === "q" ? run.qs[run.i] : null; const x = run.phase === "done" ? sc(t.results[s.id]) : null;
+    // الأسئلة التي يستطيع المعلم تعديل علامتها من الجوال
+    const done = run.phase === "q" ? run.qs.slice(0, answered()) : run.phase === "done" ? t.results[s.id]?.items || [] : null;
     return {
       phase: run.phase, name: s.name, info: `اختبار ${opName(t.op)} · ${testScope(t)}`, i: run.i, total: run.qs.length,
       q: q ? qText(q) : null, ans: q ? n(qAns(q)) : null, div: q?.op === "div", reveal: !!run.reveal, ok: q?.ok ?? null, to: !!q?.to,
@@ -81,6 +92,7 @@ export default function Run({ r }) {
       score: x ? `${n(x.c)}/${n(x.total)}` : null, pct: x ? pct(x.p) : null, avg: x ? secs(x.avgMs) : null,
       wrong: x ? t.results[s.id].items.filter((w) => !w.ok).map((w) => ({ q: qText(w), a: n(qAns(w)), to: !!w.to })) : null, next: run.phase !== "q" ? nextStud()?.name || null : null, ar: isAr(),
       cur: s.id, students: run.phase !== "q" ? studentList(classStudents(t.classId), t) : null,
+      items: done ? done.map((w) => ({ q: qText(w), a: n(qAns(w)), ok: !!w.ok, to: !!w.to })) : null,
     };
   }
   const remoteBtn = <RemoteButton onClick={() => setQrOpen(true)} />;

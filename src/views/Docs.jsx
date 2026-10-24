@@ -1,8 +1,8 @@
 import { useReducer, useState } from "react";
 import { db, settings, displayName } from "../lib/store.js";
 import { go, bulk } from "../lib/router.js";
-import { n, pct, secs, opName, fmtDate, shuffle, scoreColor, T10, toast, testScope, isTables } from "../lib/util.js";
-import { testStats, sc, qText, classStudents, classAgg, reportIds, periodText, studentAgg } from "../lib/stats.js";
+import { n, pct, secs, grade, opName, fmtDate, shuffle, scoreColor, T10, toast, testScope, isTables } from "../lib/util.js";
+import { testStats, sc, qText, classStudents, classAgg, reportIds, periodText, studentAgg, pctG, gradeOf } from "../lib/stats.js";
 import { planData, TRICKS, explainFact, splitFact, targetFacts } from "../lib/plan.js";
 import { getFam } from "../lib/section.js";
 import { arithPlanData, arithTargets, arithChallenge, arithText, arithAns, explainArith, sampleSkill, SKILLS, FAM_NAME } from "../lib/arith.js";
@@ -27,9 +27,9 @@ function ChunkMatrix({ studs, asc, ids }) {
         <thead><tr><th>الطالب</th>{p.map((t, i) => <th key={t.id}>{n(pi * per + i + 1)}. {opName(t.op)}<br />{fmtDate(t.date, true)}</th>)}<th>المتوسط العام</th></tr></thead>
         <tbody>{studs.map((s) => {
           const a = studentAgg(s.id, ids);
-          return <tr key={s.id}><td>{s.name}</td>{p.map((t) => { const r = t.results?.[s.id]; const x = sc(r); return <td key={t.id}>{r?.status === "absent" ? "غائب" : x ? <b style={{ color: scoreColor(x.p) }}>{pct(x.p)}</b> : "—"}</td>; })}<td><b>{pct(a.avg)}</b></td></tr>;
+          return <tr key={s.id}><td>{s.name}</td>{p.map((t) => { const r = t.results?.[s.id]; const x = sc(r); return <td key={t.id}>{r?.status === "absent" ? "غائب" : x ? <><b style={{ color: scoreColor(x.p) }}>{pct(x.p)}</b><small className="cell-grade">{grade(x.c, x.total)}</small></> : "—"}</td>; })}<td><><b>{pct(a.avg)}</b><small className="cell-grade">{gradeOf(a.avg, a.total)}</small></></td></tr>;
         })}</tbody>
-        <tfoot><tr><td>متوسط الاختبار</td>{p.map((t) => <td key={t.id}>{pct(testStats(t).avg)}</td>)}<td /></tr></tfoot>
+        <tfoot><tr><td>متوسط الاختبار</td>{p.map((t) => { const st = testStats(t); return <td key={t.id}>{pctG(st.avg, st.total)}</td>; })}<td /></tr></tfoot>
       </table></div>
     </div>
   ));
@@ -41,8 +41,9 @@ function TestDoc({ t }) {
     <section className="sheet"><DocHead />
       <h1 className="dtitle">تقرير اختبار {opName(t.op)} · {c?.name}</h1>
       <p className="dsub">{fmtDate(t.date)} · {testScope(t)} · {n(t.count)} سؤال · {n(t.seconds)} ثوانٍ للسؤال{t.strict ? " · استبعاد نهائي" : ""}</p>
-      <div className="kpis"><Kpi v={pct(st.avg)} label="المتوسط" /><Kpi v={pct(st.max)} label="الأعلى" /><Kpi v={pct(st.min)} label="الأقل" /><Kpi v={`${n(st.done.length)}/${n(st.studs.length)}`} label={`أنهوا · ${n(st.absent)} غائب`} /></div>
-      <Sec title="درجات الطلاب"><HBars items={ranked.map((d) => ({ label: d.s.name, p: d.x.p }))} /></Sec>
+      <div className="kpis"><Kpi v={pct(st.avg)} label={`المتوسط · ${grade(st.avgC, st.total)}`} /><Kpi v={pct(st.max)} label={`الأعلى · ${grade(st.best?.c, st.total)}`} />
+        <Kpi v={pct(st.min)} label={`الأقل · ${grade(st.worst?.c, st.total)}`} /><Kpi v={`${n(st.done.length)}/${n(st.studs.length)}`} label={`أنهوا · ${n(st.absent)} غائب`} /></div>
+      <Sec title="درجات الطلاب"><HBars items={ranked.map((d) => ({ label: d.s.name, p: d.x.p, v: `${grade(d.x.c, d.x.total)} · ${pct(d.x.p)}` }))} /></Sec>
       {isTables(t.op) && <Sec title="الدقة في كل جدول"><ColChart tables={st.tables} /></Sec>}
       <Sec title="أكثر الأسئلة خطأً"><Facts list={st.facts} op={t.op} /></Sec>
     </section>
@@ -60,14 +61,14 @@ function ClassDoc({ cid, fam }) {
   return <>
     <section className="sheet"><DocHead />
       <h1 className="dtitle">التقرير الشامل · {FAM_NAME[fam]} · {c.name}</h1><p className="dsub">{n(ag.tests.length)} اختبار · {n(studs.length)} طالب · {periodText(ag.tests)}</p>
-      <div className="kpis"><Kpi v={pct(avgs.length ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null)} label="متوسط الفصل" /><Kpi v={n(avgs.filter((x) => x >= 90).length)} label="متقن" />
+      <div className="kpis"><Kpi v={pct(avgs.length ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null)} label={`متوسط الفصل${ag.total && avgs.length ? " · " + gradeOf(avgs.reduce((a, b) => a + b, 0) / avgs.length, ag.total) : ""}`} /><Kpi v={n(avgs.filter((x) => x >= 90).length)} label="متقن" />
         <Kpi v={n(avgs.filter((x) => x >= 70 && x < 90).length)} label="جيد" /><Kpi v={n(avgs.filter((x) => x < 70).length)} label="يحتاج دعماً" /></div>
       <Sec title="متوسط الفصل في كل اختبار"><LineChart points={ag.tests.map((t) => ({ label: fmtDate(t.date, true), p: testStats(t).avg })).filter((x) => x.p != null)} /></Sec>
       {fam === "x" && <Sec title="دقة الفصل في كل جدول"><ColChart tables={ag.tables} /></Sec>}
       <Sec title="أكثر الأسئلة خطأً"><Facts list={ag.facts} /></Sec>
     </section>
     <section className="sheet">
-      <Sec title="متوسط كل طالب"><HBars items={sa.filter((x) => x.a.avg != null).sort((x, y) => y.a.avg - x.a.avg).map((x) => ({ label: x.s.name, p: x.a.avg }))} /></Sec>
+      <Sec title="متوسط كل طالب"><HBars items={sa.filter((x) => x.a.avg != null).sort((x, y) => y.a.avg - x.a.avg).map((x) => ({ label: x.s.name, p: x.a.avg, v: pctG(x.a.avg, x.a.total) }))} /></Sec>
       <Sec title="درجات الاختبارات"><ChunkMatrix studs={studs} asc={ag.tests} ids={ids} /></Sec>
     </section>
   </>;
@@ -79,7 +80,7 @@ function StudentDoc({ sid, fam }) {
   return <>
     <section className="sheet"><DocHead />
       <h1 className="dtitle">تقرير الطالب · {FAM_NAME[fam]} · {s.name}</h1><p className="dsub">{c?.name}</p>
-      <div className="kpis"><Kpi v={pct(a.avg)} label="المتوسط" /><Kpi v={secs(a.avgMs)} label="زمن الإجابة" /><Kpi v={n(a.done.length)} label="اختبار" /><Kpi v={n(a.absent)} label="غياب" /></div>
+      <div className="kpis"><Kpi v={pct(a.avg)} label={`المتوسط${a.total ? " · " + gradeOf(a.avg, a.total) : ""}`} /><Kpi v={secs(a.avgMs)} label="زمن الإجابة" /><Kpi v={n(a.done.length)} label="اختبار" /><Kpi v={n(a.absent)} label="غياب" /></div>
       <Sec title="تطور الدرجات"><LineChart points={a.done.map((e) => ({ label: fmtDate(e.t.date, true), p: e.x.p }))} /></Sec>
       {fam === "x" ? <><Sec title="الدقة في كل جدول"><ColChart tables={a.tables} /></Sec>
       <Sec title="خريطة الإتقان"><HeatMap a={a} /></Sec></> : skills.length > 0 && <Sec title="الدقة في كل مهارة"><HBars items={skills.map((v) => ({ label: v.name, p: v.p }))} /></Sec>}
@@ -104,7 +105,7 @@ function PlanDoc({ d }) {
     <section className="sheet"><DocHead />
       <div className="between"><div><h1 className="dtitle">الخطة العلاجية · {s.name}</h1><p className="muted">{c?.name}</p></div>
         <span className="lvl" style={{ background: `color-mix(in srgb,${lv.c} 14%,#fff)`, color: lv.c }}>{lv.t}</span></div>
-      <div className="kpis"><Kpi v={pct(a.avg)} label={`متوسط ${n(a.done.length)} اختبار`} /><Kpi v={secs(a.avgMs)} label="زمن الإجابة" /><Kpi v={n(wrongFacts.length)} label="حقيقة تحتاج تدريباً" /><Kpi v={n(a.absent)} label="غياب" /></div>
+      <div className="kpis"><Kpi v={pct(a.avg)} label={`متوسط ${n(a.done.length)} اختبار${a.total ? " · " + gradeOf(a.avg, a.total) : ""}`} /><Kpi v={secs(a.avgMs)} label="زمن الإجابة" /><Kpi v={n(wrongFacts.length)} label="حقيقة تحتاج تدريباً" /><Kpi v={n(a.absent)} label="غياب" /></div>
       <Sec title="الدقة في كل جدول"><ColChart tables={a.tables} /></Sec>
       <Sec title="التشخيص">
         <p><b>نقاط القوة:</b> {strong.length ? strong.map((v) => `جدول ${n(v.t)} (${pct(v.p)})`).join("، ") : "لم يصل بعد إلى إتقان ٩٠٪ في أي جدول."}</p>
@@ -235,7 +236,7 @@ function ArithPlanDoc({ d }) {
     <section className="sheet"><DocHead />
       <div className="between"><div><h1 className="dtitle">الخطة العلاجية · الجمع والطرح · {s.name}</h1><p className="muted">{c?.name}</p></div>
         <span className="lvl" style={{ background: `color-mix(in srgb,${lv.c} 14%,#fff)`, color: lv.c }}>{lv.t}</span></div>
-      <div className="kpis"><Kpi v={pct(a.avg)} label={`متوسط ${n(a.done.length)} اختبار`} /><Kpi v={secs(a.avgMs)} label="زمن الإجابة" /><Kpi v={n(wrongFacts.length)} label="سؤال يحتاج تدريباً" /><Kpi v={n(a.absent)} label="غياب" /></div>
+      <div className="kpis"><Kpi v={pct(a.avg)} label={`متوسط ${n(a.done.length)} اختبار${a.total ? " · " + gradeOf(a.avg, a.total) : ""}`} /><Kpi v={secs(a.avgMs)} label="زمن الإجابة" /><Kpi v={n(wrongFacts.length)} label="سؤال يحتاج تدريباً" /><Kpi v={n(a.absent)} label="غياب" /></div>
       <Sec title="الدقة في كل مهارة"><HBars items={d.tbl.map((v) => ({ label: v.name, p: v.p }))} /></Sec>
       <Sec title="التشخيص">
         <p><b>نقاط القوة:</b> {strong.length ? strong.map((v) => `${v.name} (${pct(v.p)})`).join("، ") : "لم يصل بعد إلى إتقان ٩٠٪ في أي مهارة."}</p>

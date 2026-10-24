@@ -8,6 +8,8 @@ const AR = "٠١٢٣٤٥٦٧٨٩";
 export const isAr = () => CFG.digits !== "latn";
 export const n = (x) => { const s = String(x); return isAr() ? s.replace(/\d/g, (d) => AR[d]).replace(/\./g, "٫") : s; };
 export const pct = (p) => (p == null || isNaN(p) ? "—" : n(Math.round(p)) + (isAr() ? "٪" : "%"));
+// الدرجة: عدد الإجابات الصحيحة من عدد الأسئلة، مثل ٨/١٠ (المتوسط بخانة عشرية واحدة إذا لزم)
+export const grade = (c, total) => (c == null ? "—" : n(Math.round(c * 10) / 10) + "/" + n(total));
 export const secs = (ms) => (ms == null ? "—" : n((ms / 1000).toFixed(1)) + " ث");
 export function fmtDate(ts, short) {
   try {

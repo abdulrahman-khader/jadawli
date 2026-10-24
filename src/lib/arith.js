@@ -1,7 +1,7 @@
 // الخطة العلاجية وورقة العمل للجمع والطرح: تصنيف الأخطاء حسب المهارة، وشرح طريقة الحل
 import { db } from "./store.js";
 import { n, isTables, shuffle } from "./util.js";
-import { studentHistory } from "./stats.js";
+import { studentHistory, commonTotal } from "./stats.js";
 
 // عائلة الاختبار: x = الضرب والقسمة، pm = الجمع والطرح
 import { famOf } from "./section.js";
@@ -96,7 +96,7 @@ export function arithPlanData(sid) {
   // التمارين الإضافية في الورقة تتبع آخر اختبار جمع أو طرح للطالب
   const last = done[done.length - 1].t; const mainOp = last.op, mainLevel = last.level || 1;
   return {
-    fam: "pm", s, c: db.data.classes[s.classId], a: { done, absent: h.filter((e) => e.r.status === "absent").length, avg, avgMs: msn ? ms / msn : null },
+    fam: "pm", s, c: db.data.classes[s.classId], a: { done, absent: h.filter((e) => e.r.status === "absent").length, avg, total: commonTotal(done.map((e) => e.x)), avgMs: msn ? ms / msn : null },
     tbl, weak, slow, strong, wrongFacts, focus, lv, ops, levels, kinds: [...kinds].map((k) => { const [op, lv] = k.split("|"); return [op, +lv]; }), mainOp, mainLevel,
   };
 }

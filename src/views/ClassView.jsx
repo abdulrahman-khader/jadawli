@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { db, put, del } from "../lib/store.js";
 import { go } from "../lib/router.js";
-import { n, pct, secs, uid, toast, opSym, opName, fmtDate, scoreColor, downloadCSV, testScope } from "../lib/util.js";
-import { classStudents, classTests, testStats, studentAgg, classAgg, reportIds, reportKey, periodText, sc } from "../lib/stats.js";
+import { n, pct, secs, grade, uid, toast, opSym, opName, fmtDate, scoreColor, downloadCSV, testScope } from "../lib/util.js";
+import { classStudents, classTests, testStats, studentAgg, classAgg, reportIds, reportKey, periodText, sc, pctG, gradeOf } from "../lib/stats.js";
 import { getFam, FAM_NAME } from "../lib/section.js";
 import { SectionSwitch } from "../components/section.jsx";
 import {
@@ -61,7 +61,7 @@ function Students({ c, studs, fam }) {
         return (
           <Row key={s.id}><Avatar name={s.name} />
             <RowMain title={s.name} onClick={() => go("student", s.id)}
-              sub={a.done.length ? <><Stars p={a.avg} /> <span>المتوسط {pct(a.avg)}</span> · <span>{n(a.done.length)} اختبار</span></> : "لم يُختبر بعد"} />
+              sub={a.done.length ? <><Stars p={a.avg} /> <span>المتوسط {pctG(a.avg, a.total)}</span> · <span>{n(a.done.length)} اختبار</span></> : "لم يُختبر بعد"} />
             <RowActions><ConfirmButton variant="ghost" size="icon-sm" className="text-destructive" aria-label={"حذف " + s.name}
               confirmText={`حذف الطالب «${s.name}»؟`} desc="ستبقى نتائجه القديمة في الاختبارات." action="حذف"
               onConfirm={() => { del("students", s.id); toast("حُذف الطالب"); }}><Icon name="trash" /></ConfirmButton></RowActions>
@@ -98,7 +98,7 @@ function Tests({ tests, fam }) {
       <Row key={t.id}><OpTag op={t.op} />
         <RowMain title={`اختبار ${opName(t.op)} · ${fmtDate(t.date)}`} onClick={() => go("test", t.id)}
           sub={<><span>{testScope(t)}</span> · <span>{n(t.count)} سؤال</span>{t.strict && <> · <span>استبعاد نهائي</span></>}</>} />
-        <RowActions>{st.avg != null && <Badge className="bg-secondary text-primary">{pct(st.avg)}</Badge>}<Badge variant="outline">{n(st.done.length)}/{n(st.studs.length)}</Badge>
+        <RowActions>{st.avg != null && <Badge className="bg-secondary text-primary">{pctG(st.avg, st.total)}</Badge>}<Badge variant="outline">{n(st.done.length)}/{n(st.studs.length)}</Badge>
           {st.pending > 0 && <Badge className="bg-warm/30 text-foreground">باقي {n(st.pending)}</Badge>}</RowActions>
       </Row>
     );
@@ -112,10 +112,10 @@ export function Matrix({ studs, asc, ids, links }) {
       <tbody>{studs.map((s) => {
         const a = studentAgg(s.id, ids);
         return <tr key={s.id}><td>{links ? <button type="button" className="cursor-pointer font-bold text-primary underline underline-offset-3" onClick={() => go("student", s.id)}>{s.name}</button> : s.name}</td>
-          {asc.map((t) => { const rr = t.results?.[s.id]; const x = sc(rr); return <td key={t.id}>{rr?.status === "absent" ? "غائب" : x ? <b style={{ color: scoreColor(x.p) }}>{pct(x.p)}</b> : "—"}</td>; })}
-          <td><b>{pct(a.avg)}</b></td></tr>;
+          {asc.map((t) => { const rr = t.results?.[s.id]; const x = sc(rr); return <td key={t.id}>{rr?.status === "absent" ? "غائب" : x ? <><b style={{ color: scoreColor(x.p) }}>{pct(x.p)}</b><small className="cell-grade">{grade(x.c, x.total)}</small></> : "—"}</td>; })}
+          <td><><b>{pct(a.avg)}</b><small className="cell-grade">{gradeOf(a.avg, a.total)}</small></></td></tr>;
       })}</tbody>
-      <tfoot><tr><td>متوسط الاختبار</td>{asc.map((t) => <td key={t.id}>{pct(testStats(t).avg)}</td>)}<td /></tr></tfoot>
+      <tfoot><tr><td>متوسط الاختبار</td>{asc.map((t) => { const st = testStats(t); return <td key={t.id}>{pctG(st.avg, st.total)}</td>; })}<td /></tr></tfoot>
     </table></div>
   );
 }
@@ -138,7 +138,7 @@ function Report({ c, studs, tests, fam }) {
     await nextFrame();
     const asc = ag.tests;
     const rows = [["الطالب", ...asc.map((t) => `${opName(t.op)} ${new Date(t.date).toISOString().slice(0, 10)}`), "المتوسط"]];
-    studs.forEach((s) => { const a = studentAgg(s.id, ids); rows.push([s.name, ...asc.map((t) => { const rr = t.results?.[s.id]; const x = sc(rr); return rr?.status === "absent" ? "غائب" : x ? Math.round(x.p) + "%" : ""; }), a.avg != null ? Math.round(a.avg) + "%" : ""]); });
+    studs.forEach((s) => { const a = studentAgg(s.id, ids); rows.push([s.name, ...asc.map((t) => { const rr = t.results?.[s.id]; const x = sc(rr); return rr?.status === "absent" ? "غائب" : x ? `${x.c}/${x.total} (${Math.round(x.p)}%)` : ""; }), a.avg != null ? (a.total ? `${Math.round((a.avg * a.total) / 10) / 10}/${a.total} (${Math.round(a.avg)}%)` : Math.round(a.avg) + "%") : ""]); });
     downloadCSV(`تقرير ${c.name} - ${FAM_NAME[fam]}`, rows); toast("نُزّل ملف Excel");
   });
   return (
@@ -159,7 +159,7 @@ function Report({ c, studs, tests, fam }) {
                 <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5" key={t.id}>
                   <Checkbox checked={ids.includes(t.id)} onCheckedChange={(v) => toggle(t.id, !!v)} className="size-5" />
                   <OpTag op={t.op} /><RowMain title={`اختبار ${opName(t.op)} · ${fmtDate(t.date)}`} sub={testScope(t)} />
-                  {st.avg != null && <Badge className="bg-secondary text-primary">{pct(st.avg)}</Badge>}
+                  {st.avg != null && <Badge className="bg-secondary text-primary">{pctG(st.avg, st.total)}</Badge>}
                 </label>
               );
             })}</div>
@@ -172,7 +172,7 @@ function Report({ c, studs, tests, fam }) {
           <Button onClick={() => go("doc", c.id, "class", fam)}><Icon name="pdf" /> تقرير الفصل PDF</Button>
           <Btn variant="outline" loading={busyX} onClick={excel}><Icon name="xls" /> Excel</Btn>
         </div>
-        <div className="kpis"><Kpi v={n(ag.tests.length)} label="اختبار" /><Kpi v={pct(avgs.length ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null)} label="متوسط الفصل" /><Kpi v={n(avgs.filter((x) => x < 70).length)} label="طالب يحتاج دعماً" /></div>
+        <div className="kpis"><Kpi v={n(ag.tests.length)} label="اختبار" /><Kpi v={pct(avgs.length ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null)} label={`متوسط الفصل${ag.total && avgs.length ? " · " + gradeOf(avgs.reduce((a, b) => a + b, 0) / avgs.length, ag.total) : ""}`} /><Kpi v={n(avgs.filter((x) => x < 70).length)} label="طالب يحتاج دعماً" /></div>
         <Panel title="متوسط الفصل في كل اختبار"><LineChart points={ag.tests.map((t) => ({ label: fmtDate(t.date, true), p: testStats(t).avg })).filter((x) => x.p != null)} /></Panel>
         {fam === "x" && <Panel title="دقة الفصل في كل جدول"><ColChart tables={ag.tables} /></Panel>}
         <h2>درجات الاختبارات المختارة</h2><Matrix studs={studs} asc={ag.tests} ids={ids} links />
@@ -192,7 +192,7 @@ function Rank({ studs, fam }) {
         return (
           <Row key={x.s.id}><span className={"grid size-8 flex-none place-items-center rounded-full font-display font-bold " + (i === 0 ? "bg-warm text-warm-foreground" : "bg-muted")}>{n(i + 1)}</span>
             <RowMain title={x.s.name} onClick={() => go("student", x.s.id)} sub={<><Stars p={x.a.avg} /> <span>متوسط الزمن {secs(x.a.avgMs)}</span></>} />
-            <RowActions><Badge className="bg-secondary text-primary">{pct(x.a.avg)}</Badge>
+            <RowActions><Badge className="bg-secondary text-primary">{pctG(x.a.avg, x.a.total)}</Badge>
               {d != null && Math.round(d) !== 0 && <Badge className={d > 0 ? "bg-success/15 text-success" : "bg-destructive/12 text-destructive"}>{d > 0 ? "▲" : "▼"} {pct(Math.abs(d))}</Badge>}</RowActions>
           </Row>
         );

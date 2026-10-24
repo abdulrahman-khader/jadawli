@@ -2,7 +2,7 @@ import { useState } from "react";
 import { db, put, settings, displayName, logout, mode } from "../lib/store.js";
 import { go, bulk } from "../lib/router.js";
 import { n, pct, secs, opName, fmtDate, toast, testScope } from "../lib/util.js";
-import { studentAgg, classStudents } from "../lib/stats.js";
+import { studentAgg, classStudents, pctG, gradeOf } from "../lib/stats.js";
 import { arithPlanData } from "../lib/arith.js";
 import { getFam, FAM_NAME } from "../lib/section.js";
 import { SectionSwitch } from "../components/section.jsx";
@@ -39,7 +39,7 @@ export function Student({ r }) {
         <Button variant="outline" onClick={() => go("doc", s.id, "student", fam)}><Icon name="pdf" /> تقرير الطالب</Button>
       </div>}
       {a.h.length ? <>
-        <div className="kpis"><Kpi v={pct(a.avg)} label="متوسط الدرجات" /><Kpi v={secs(a.avgMs)} label="متوسط زمن الإجابة" /><Kpi v={n(a.done.length)} label="اختبار" /><Kpi v={n(a.absent)} label="غياب" /></div>
+        <div className="kpis"><Kpi v={pct(a.avg)} label={`متوسط الدرجات${a.total ? " · " + gradeOf(a.avg, a.total) : ""}`} /><Kpi v={secs(a.avgMs)} label="متوسط زمن الإجابة" /><Kpi v={n(a.done.length)} label="اختبار" /><Kpi v={n(a.absent)} label="غياب" /></div>
         <Panel title="تطور الدرجات"><LineChart points={a.done.map((e) => ({ label: fmtDate(e.t.date, true), p: e.x.p }))} /></Panel>
         {fam === "pm" && skills.length > 0 && <Panel title="الدقة في كل مهارة"><HBars items={skills.map((v) => ({ label: v.name, p: v.p }))} /></Panel>}
         {fam === "x" && <><Panel title="الدقة في كل جدول"><ColChart tables={a.tables} /></Panel>
@@ -49,7 +49,7 @@ export function Student({ r }) {
           <Row key={e.t.id}><OpTag op={e.t.op} />
             <RowMain title={`اختبار ${opName(e.t.op)} · ${fmtDate(e.t.date)}`} sub={testScope(e.t)} />
             <RowActions>{e.r.status === "absent" ? <Badge variant="outline">غائب</Badge> : <>
-              <Score p={e.x.p}>{n(e.x.c)}/{n(e.x.total)}</Score>
+              <Score p={e.x.p}>{n(e.x.c)}/{n(e.x.total)} · {pct(e.x.p)}</Score>
               <Button variant="outline" size="sm" onClick={() => go("result", e.t.id, null, s.id)}>الأخطاء</Button></>}</RowActions>
           </Row>
         ))}</List>
@@ -81,7 +81,7 @@ export function Bulk({ r }) {
           <Row key={s.id} className={ok ? "cursor-pointer" : "opacity-60"} onClick={() => ok && toggle(s.id)}>
             <Checkbox disabled={!ok} checked={sel.has(s.id)} onCheckedChange={() => toggle(s.id)} onClick={(e) => e.stopPropagation()} className="size-5" aria-label={s.name} />
             <Avatar name={s.name} />
-            <RowMain title={s.name} sub={ok ? <><Stars p={a.avg} /> <span>المتوسط {pct(a.avg)}</span></> : "لم يُختبر بعد، لا توجد له ورقة"} />
+            <RowMain title={s.name} sub={ok ? <><Stars p={a.avg} /> <span>المتوسط {pctG(a.avg, a.total)}</span></> : "لم يُختبر بعد، لا توجد له ورقة"} />
           </Row>
         );
       })}</List>

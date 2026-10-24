@@ -4,7 +4,7 @@ import { useRemoteHost } from "../lib/remote.js";
 import { famOf, setFam } from "../lib/section.js";
 import { RemoteButton, RemoteQr, studentList } from "../components/remote-qr.jsx";
 import { go } from "../lib/router.js";
-import { n, pct, secs, toast, opName, fmtDate, downloadCSV, isAr, testScope, isTables } from "../lib/util.js";
+import { n, pct, secs, grade, toast, opName, fmtDate, downloadCSV, isAr, testScope, isTables } from "../lib/util.js";
 import { testStats, sc, qText, qAns, qPlain } from "../lib/stats.js";
 import {
   Shell, Avatar, Icon, Empty, Kpi, OpTag, ConfirmButton, PageHead, Panel, List, Row, RowMain, RowActions, Score, Btn, useBusy, nextFrame, Hint,
@@ -46,7 +46,8 @@ export default function TestView({ r }) {
         <Badge variant="outline">{n(t.count)} سؤال</Badge><Badge variant="outline">{n(t.seconds)} ثوانٍ للسؤال</Badge>{t.strict && <Badge className="bg-warm/30 text-foreground">استبعاد نهائي</Badge>}</div>
       {next && <Button variant="warm" size="xl" onClick={() => go("run", t.id, null, next.id)}><Icon name="play" /> ابدأ مع {next.name}</Button>}
       <RemoteButton className="self-start" onClick={() => setQrOpen(true)} /><RemoteQr open={qrOpen} onClose={() => setQrOpen(false)} />
-      <div className="kpis"><Kpi v={pct(st.avg)} label="المتوسط" /><Kpi v={pct(st.max)} label="الأعلى" /><Kpi v={pct(st.min)} label="الأقل" />
+      <div className="kpis"><Kpi v={pct(st.avg)} label={`المتوسط · ${grade(st.avgC, st.total)}`} /><Kpi v={pct(st.max)} label={`الأعلى · ${grade(st.best?.c, st.total)}`} />
+        <Kpi v={pct(st.min)} label={`الأقل · ${grade(st.worst?.c, st.total)}`} />
         <Kpi v={`${n(st.done.length)}/${n(st.studs.length)}`} label={`أنهوا · ${n(st.absent)} غائب`} /></div>
       <h2>الطلاب</h2>
       {st.studs.length ? <List>{st.studs.map((s) => {

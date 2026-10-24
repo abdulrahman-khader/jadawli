@@ -44,6 +44,31 @@ function Students({ list, cur, onPick, open: open0 = false, disabled }) {
   );
 }
 
+// تعديل الدرجة: الضغط على علامة سؤال يحوّلها من صح إلى خطأ أو العكس
+function Answers({ items, onFlip, busy, disabled, title }) {
+  const [open, setOpen] = useState(false);
+  if (!items?.length) return null;
+  const ok = items.filter((x) => x.ok).length;
+  return (
+    <div className="w-full rounded-xl border bg-card text-start">
+      <button type="button" className="flex w-full cursor-pointer items-center justify-between px-4 py-3 font-bold" onClick={() => setOpen(!open)}>
+        <span>{title} <span className="text-sm font-normal text-muted-foreground">· الصحيح {ar(ok)} من {ar(items.length)}</span></span>
+        <ChevronDown className={cn("size-5 transition", open && "rotate-180")} /></button>
+      {open && <div className="max-h-[50dvh] divide-y overflow-y-auto border-t">
+        <p className="px-4 py-2 text-sm text-muted-foreground">اضغط على العلامة لتحويلها من صح إلى خطأ أو العكس.</p>
+        {items.map((x, j) => (
+          <div key={j} className={cn("flex items-center gap-2 px-4 py-2", !x.ok && "bg-destructive/6")}>
+            <span className="text-sm text-muted-foreground">{ar(j + 1)}.</span>
+            <b className="flex-1 font-display text-lg [unicode-bidi:isolate]" dir="rtl">{x.q} = {x.a}</b>
+            {x.to && <small className="text-muted-foreground">انتهى الوقت</small>}
+            <Button size="icon-lg" variant={x.ok ? "success" : "destructive"} disabled={disabled} aria-label={x.ok ? "صح، اضغط لجعلها خطأ" : "خطأ، اضغط لجعلها صح"}
+              onClick={() => onFlip(j)}>{busy(j) ? <Spinner className="text-current" /> : x.ok ? "✓" : "✗"}</Button>
+          </div>
+        ))}</div>}
+    </div>
+  );
+}
+
 function RemoteInner({ tok }) {
   const [d, send] = useRemoteClient(tok);
   const [, tick] = useReducer((x) => x + 1, 0);
@@ -64,13 +89,16 @@ function RemoteInner({ tok }) {
     get(); document.addEventListener("visibilitychange", get);
     return () => { document.removeEventListener("visibilitychange", get); lock?.release?.().catch(() => {}); };
   }, []);
-  const press = (c, extra) => {
-    navigator.vibrate?.(25); setSent(c);
+  // key: ما يظهر عليه التحميل (لأزرار تعديل الدرجة: رقم السؤال)
+  const press = (c, extra, key = c) => {
+    navigator.vibrate?.(25); setSent(key);
     send(c, extra).catch(() => { setSent(null); toast("تعذّر الإرسال. تحقّق من الإنترنت في الجوال"); });
-    setTimeout(() => setSent((x) => (x === c ? null : x)), 4000);
+    setTimeout(() => setSent((x) => (x === key ? null : x)), 4000);
   };
   const busy = (c) => sent === c;
   const spin = (c, label) => (busy(c) ? <Spinner className="text-current" /> : label);
+  const flip = (j) => press("flip", { j }, "flip" + j);
+  const flipBusy = (j) => busy("flip" + j);
 
   if (d === undefined) return <Box><Spinner label="جارٍ الاتصال…" /></Box>;
   if (d === null) return <Box><h2>الرابط غير صالح</h2><p className="text-muted-foreground">امسح الباركود من جديد من شاشة الاختبار.</p></Box>;
@@ -123,6 +151,7 @@ function RemoteInner({ tok }) {
             <Button variant="outline" size="lg" onClick={toggleAns}>{showAns ? <><EyeOff /> إخفاء الجواب</> : <><Eye /> إظهار الجواب</>}</Button>
           </div>
         </>}
+        <Answers title="تعديل الدرجة" items={s.items} onFlip={flip} busy={flipBusy} disabled={!!sent} />
       </Box>
     );
   }
@@ -135,6 +164,7 @@ function RemoteInner({ tok }) {
       {s.wrong?.length ? <div className="w-full rounded-xl border bg-card p-4 text-start"><b>الأسئلة الخاطئة</b>
         <div className="facts mt-2">{s.wrong.map((w, i) => <div className="fact bad" key={i}><b dir="rtl">{w.q} = {w.a}</b><small>{w.to ? "انتهى الوقت" : "إجابة خاطئة"}</small></div>)}</div></div>
         : s.wrong && <Badge className="bg-success/15 px-3 py-1 text-base text-success">كل الإجابات صحيحة!</Badge>}
+      <Answers title="تعديل الدرجة" items={s.items} onFlip={flip} busy={flipBusy} disabled={!!sent} />
       {s.next ? <Button variant="warm" size="xl" className="h-16 text-xl" disabled={!!sent} onClick={() => press("nextStudent")}>{spin("nextStudent", `الطالب التالي: ${s.next}`)}</Button>
         : <Badge className="bg-success/15 px-3 py-1 text-base text-success">اختُبر جميع الطلاب</Badge>}
       <Students list={s.students} cur={s.cur} onPick={pick} disabled={!!sent} />

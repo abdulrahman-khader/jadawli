@@ -1,10 +1,17 @@
 // الحسابات: الدرجات، الإحصاءات، توليد الأسئلة
 import { db } from "./store.js";
-import { n, fmtDate, shuffle, T10, isTables } from "./util.js";
+import { n, pct, grade, fmtDate, shuffle, T10, isTables } from "./util.js";
 
 export const classStudents = (cid) => Object.values(db.data.students).filter((s) => s.classId === cid).sort((a, b) => a.name.localeCompare(b.name, "ar"));
 // fam: "x" أو "pm" لاختبارات قسم واحد فقط
 export const classTests = (cid, fam) => Object.values(db.data.tests).filter((t) => t.classId === cid && (!fam || (fam === "x") === isTables(t.op))).sort((a, b) => b.date - a.date);
+
+// عدد الأسئلة المشترك بين النتائج (مثل ١٠)، أو null إذا اختلف من اختبار لآخر
+export const commonTotal = (xs) => { const s = new Set(xs.map((x) => x.total)); return s.size === 1 ? [...s][0] : null; };
+// الدرجة المقابلة لمتوسط نسبة: ٧٥٪ من ١٠ أسئلة = ٧٫٥/١٠. لا تُعرض إذا اختلف عدد الأسئلة بين الاختبارات
+export const gradeOf = (p, total) => (p == null || !total ? "" : grade((p * total) / 100, total));
+// النسبة مع الدرجة: «٨٠٪ · ٨/١٠»
+export const pctG = (p, total) => { const g = gradeOf(p, total); return g ? `${pct(p)} · ${g}` : pct(p); };
 
 export function sc(r) {
   if (!r || r.status !== "done") return null;
@@ -29,10 +36,14 @@ export function testStats(t) {
     }
   }
   const ps = done.map((d) => d.x.p);
+  // الدرجة (عدد الصحيح من عدد الأسئلة) بجانب النسبة: الأعلى والأقل ومتوسط الصحيح
+  const byP = done.slice().sort((a, b) => b.x.p - a.x.p);
   return {
     studs, done, absent, pending: studs.length - done.length - absent,
     avg: ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null,
     max: ps.length ? Math.max(...ps) : null, min: ps.length ? Math.min(...ps) : null,
+    best: byP[0]?.x || null, worst: byP[byP.length - 1]?.x || null,
+    avgC: done.length ? done.reduce((a, d) => a + d.x.c, 0) / done.length : null, total: done[0]?.x.total ?? t.count,
     facts: Object.values(facts).filter((f) => f.wrong).sort((a, b) => b.wrong - a.wrong || b.wrong / b.tries - a.wrong / a.tries), tables,
   };
 }
@@ -54,7 +65,7 @@ export function studentAgg(sid, ids, fam) {
     if (!q.to) { tb.ms += q.ms; tb.msn++; }
   }
   const ps = done.map((e) => e.x.p);
-  return { h, done, absent, facts, tables, avg: ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null, avgMs: msn ? ms / msn : null, first: ps[0], last: ps[ps.length - 1] };
+  return { h, done, absent, facts, tables, total: commonTotal(done.map((e) => e.x)), avg: ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null, avgMs: msn ? ms / msn : null, first: ps[0], last: ps[ps.length - 1] };
 }
 // اختيار الاختبارات المشمولة في التقرير الشامل محفوظ لكل قسم على حدة
 export const reportKey = (fam) => (fam === "pm" ? "reportSelPm" : "reportSel");
@@ -68,13 +79,13 @@ export function periodText(tests) {
   return fmtDate(a) === fmtDate(b) ? fmtDate(a) : `من ${fmtDate(a)} إلى ${fmtDate(b)}`;
 }
 export function classAgg(cid, ids) {
-  const tests = classTests(cid).slice().reverse().filter((t) => !ids || ids.includes(t.id)); const tables = {}, facts = {};
+  const tests = classTests(cid).slice().reverse().filter((t) => !ids || ids.includes(t.id)); const tables = {}, facts = {}, xs = [];
   tests.forEach((t) => {
-    const st = testStats(t);
+    const st = testStats(t); st.done.forEach((d) => xs.push(d.x));
     for (const [k, v] of Object.entries(st.tables)) { const a = (tables[k] = tables[k] || { tries: 0, c: 0 }); a.tries += v.tries; a.c += v.c; }
     st.facts.forEach((f) => { const k = f.op + f.t + "|" + f.m; const a = (facts[k] = facts[k] || { ...f, tries: 0, wrong: 0 }); a.tries += f.tries; a.wrong += f.wrong; });
   });
-  return { tests, tables, facts: Object.values(facts).sort((a, b) => b.wrong - a.wrong) };
+  return { tests, tables, total: commonTotal(xs), facts: Object.values(facts).sort((a, b) => b.wrong - a.wrong) };
 }
 
 // ---------- توليد الأسئلة ----------

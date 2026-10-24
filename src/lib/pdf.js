@@ -29,6 +29,12 @@ function cutPoints(sheet) {
 // دقة الصورة: PNG بثلاثة أضعاف الشاشة حتى يكون النص حاداً عند الطباعة،
 // وضعفين فقط للملفات الكبيرة (أوراق الفصل كله) حتى لا يكبر حجم الملف كثيراً
 const img = (c) => c.toDataURL("image/png");
+// Safari (آيباد) لا يرسم صورة أكبر من ١٦٫٧ مليون نقطة تقريباً، فالصفحة الطويلة جداً (مثل جدول درجات فيه اختبارات كثيرة)
+// كانت تخرج بيضاء أو يفشل الملف. نخفّض الدقة لهذه الصفحة فقط حتى تبقى تحت الحد
+const MAX_PX = 16e6;
+const ratioFor = (el, scale) => Math.min(scale, Math.sqrt(MAX_PX / (el.offsetWidth * Math.max(el.scrollHeight, 1))));
+// Safari لا يحرر ذاكرة الصورة فوراً، فنفرّغها بأنفسنا بعد الاستعمال
+const free = (c) => { c.width = 0; c.height = 0; };
 
 // النص الذي يظهر في سطر واحد على الشاشة نمنعه من الالتفاف داخل الصورة
 // (قياس الخط داخل الصورة يختلف قليلاً، فكانت كلمات مثل «أخطأ ١ من ٢» تنكسر وتخرج من المربع)
@@ -87,9 +93,9 @@ export async function sheetsToPdf(sheets, fileName, onProgress) {
       await new Promise((r) => setTimeout(r, 0)); // نترك المتصفح يحدّث العدّاد
       const el = sheets[i]; const cuts = cutPoints(el); const unlock = lockLines(el);
       let canvas;
-      const opts = { pixelRatio: SCALE, backgroundColor: "#ffffff", fontEmbedCSS, skipFonts: !fontEmbedCSS, cacheBust: false };
+      const opts = { pixelRatio: ratioFor(el, SCALE), backgroundColor: "#ffffff", fontEmbedCSS, skipFonts: !fontEmbedCSS, cacheBust: false };
       try {
-        if (i === 0 || SAFARI) { await toCanvas(el, { ...opts, pixelRatio: 1 }); await new Promise((r) => setTimeout(r, SAFARI ? 150 : 0)); } // تسخين
+        if (i === 0 || SAFARI) { free(await toCanvas(el, { ...opts, pixelRatio: 1 })); await new Promise((r) => setTimeout(r, SAFARI ? 150 : 0)); } // تسخين
         canvas = await toCanvas(el, opts);
       }
       finally { unlock(); }
@@ -101,6 +107,7 @@ export async function sheetsToPdf(sheets, fileName, onProgress) {
         if (!first) pdf.addPage([A4W, A4H]);
         first = false;
         pdf.addImage(img(canvas), "PNG", (A4W - w) / 2, 0, w, total * s, undefined, "FAST");
+        free(canvas);
         continue;
       }
       for (let j = 0; j < cuts.length - 1; j++) {
@@ -110,7 +117,9 @@ export async function sheetsToPdf(sheets, fileName, onProgress) {
         if (!first) pdf.addPage([A4W, A4H]);
         first = false;
         pdf.addImage(img(part), "PNG", 0, j === 0 ? 0 : MARGIN, A4W, h, undefined, "FAST");
+        free(part);
       }
+      free(canvas);
     }
     pdf.save(fileName.replace(/[\\/:*?"<>|]/g, "-") + ".pdf");
   } finally {

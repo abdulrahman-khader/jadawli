@@ -7,7 +7,7 @@ export function HBars({ items }) {
     <div className="hb">{items.map((it, i) => (
       <div className="hb-row" key={i}><span className="hb-l">{it.label}</span>
         <div className="hb-t"><i style={{ width: (it.p ?? 0) + "%", background: levelColor(it.p) }} /></div>
-        <span className="hb-v">{it.p == null ? "—" : pct(it.p)}</span></div>
+        <span className="hb-v">{it.v ?? (it.p == null ? "—" : pct(it.p))}</span></div>
     ))}</div>
   );
 }

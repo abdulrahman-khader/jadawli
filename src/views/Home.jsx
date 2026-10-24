@@ -1,7 +1,7 @@
 import { db, put, displayName } from "../lib/store.js";
 import { go } from "../lib/router.js";
-import { n, pct, uid, levelColor, toast } from "../lib/util.js";
-import { classStudents, classTests, testStats } from "../lib/stats.js";
+import { n, uid, levelColor, toast } from "../lib/util.js";
+import { classStudents, classTests, testStats, pctG } from "../lib/stats.js";
 import { TopBar, Avatar, Icon, Empty } from "../components/app.jsx";
 import { Card } from "../components/ui/card.jsx";
 import { Input } from "../components/ui/input.jsx";
@@ -22,14 +22,14 @@ export default function Home() {
       <main className="mx-auto -mt-10 flex max-w-4xl flex-col gap-4 px-4 pb-16">
         {cls.length ? (
           <section className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3.5">{cls.map((c) => {
-            const st = classStudents(c.id).length, ts = classTests(c.id), avg = ts.length ? testStats(ts[0]).avg : null;
+            const st = classStudents(c.id).length, ts = classTests(c.id), last = ts.length ? testStats(ts[0]) : null, avg = last?.avg ?? null;
             return (
               <Card key={c.id} role="button" tabIndex={0} onClick={() => go("class", c.id)} onKeyDown={(e) => e.key === "Enter" && go("class", c.id)}
                 className="cursor-pointer gap-3 p-5 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none">
                 <div className="flex items-center gap-3"><Avatar name={c.name} /><div><div className="font-display text-xl font-bold">{c.name}</div>
                   <div className="text-sm text-muted-foreground">{n(st)} طالب · {n(ts.length)} اختبار</div></div></div>
                 <div className="h-2 overflow-hidden rounded bg-muted"><i className="block h-full rounded" style={{ width: (avg ?? 0) + "%", background: levelColor(avg) }} /></div>
-                <div className="flex justify-between text-sm text-muted-foreground"><span>آخر اختبار</span><b className="font-display tabular-nums text-foreground">{avg != null ? pct(avg) : "—"}</b></div>
+                <div className="flex justify-between text-sm text-muted-foreground"><span>آخر اختبار</span><b className="font-display tabular-nums text-foreground">{avg != null ? pctG(avg, last.total) : "—"}</b></div>
               </Card>
             );
           })}</section>
